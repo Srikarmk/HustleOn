@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "HustleOn-Expo",
-    "slug": "HustleOn-Expo",
+    "name": "HustleOn",
+    "slug": "HustleOn",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
