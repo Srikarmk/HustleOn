@@ -1,13 +1,20 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppState, Workout, Meal, BMIRecord, UserProfile, BodyMeasurement, ProgressPhoto, Goal, Integration, NotificationPreference, PrivacySettings, ThemeSettings, Friend } from '../types';
+import { AppState, Workout, Meal, Supplement, BMIRecord, UserProfile, BodyMeasurement, ProgressPhoto, Goal, Integration, NotificationPreference, PrivacySettings, ThemeSettings, Friend } from '../types';
 
 const STORAGE_KEY = '@hustleon:app_data';
+
+const DEFAULT_SUPPLEMENTS: Supplement[] = [
+  { id: 'sup-1', name: 'Vitamin D', takenToday: false },
+  { id: 'sup-2', name: 'Multivitamin', takenToday: false },
+  { id: 'sup-3', name: 'Protein', takenToday: false },
+];
 
 export const useStore = create<AppState>((set, get) => ({
   userProfile: null,
   workouts: [],
   meals: [],
+  supplements: [],
   bmiRecords: [],
   bodyMeasurements: [],
   progressPhotos: [],
@@ -69,6 +76,33 @@ export const useStore = create<AppState>((set, get) => ({
   removeMeal: (id) => {
     set((state) => ({
       meals: state.meals.filter((m) => m.id !== id),
+    }));
+    get().saveData();
+  },
+
+  addSupplement: (supplement) => {
+    set((state) => ({ supplements: [...state.supplements, supplement] }));
+    get().saveData();
+  },
+
+  removeSupplement: (id) => {
+    set((state) => ({
+      supplements: state.supplements.filter((s) => s.id !== id),
+    }));
+    get().saveData();
+  },
+
+  toggleSupplementTaken: (id, date) => {
+    set((state) => ({
+      supplements: state.supplements.map((s) => {
+        if (s.id !== id) return s;
+        const isSameDay = s.date === date;
+        return {
+          ...s,
+          date,
+          takenToday: isSameDay ? !s.takenToday : true,
+        };
+      }),
     }));
     get().saveData();
   },
@@ -208,6 +242,7 @@ export const useStore = create<AppState>((set, get) => ({
           userProfile: parsed.userProfile || null,
           workouts: parsed.workouts || [],
           meals: parsed.meals || [],
+          supplements: parsed.supplements?.length ? parsed.supplements : DEFAULT_SUPPLEMENTS,
           bmiRecords: parsed.bmiRecords || [],
           bodyMeasurements: parsed.bodyMeasurements || [],
           progressPhotos: parsed.progressPhotos || [],
@@ -255,6 +290,7 @@ export const useStore = create<AppState>((set, get) => ({
         userProfile: state.userProfile,
         workouts: state.workouts,
         meals: state.meals,
+        supplements: state.supplements,
         bmiRecords: state.bmiRecords,
         bodyMeasurements: state.bodyMeasurements,
         progressPhotos: state.progressPhotos,

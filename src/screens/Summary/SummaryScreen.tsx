@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store';
-import { COLORS, SIZES } from '../../constants/theme';
+import { COLORS, FONTS, SIZES } from '../../constants/theme';
 import { generateGeminiResponse } from '../../config/gemini';
 
 export const SummaryScreen: React.FC = () => {
@@ -88,7 +88,12 @@ export const SummaryScreen: React.FC = () => {
     dayCounts[dayName]++;
   });
 
-  const maxDayCount = Math.max(...Object.values(dayCounts), 1);
+  // Dummy trend data when no workouts so charts still show something
+  const useDummyTrends = totalWorkouts === 0;
+  const displayDayCounts = useDummyTrends
+    ? { Sun: 1, Mon: 3, Tue: 2, Wed: 4, Thu: 2, Fri: 3, Sat: 1 }
+    : dayCounts;
+  const maxDayCount = Math.max(...Object.values(displayDayCounts), 1);
 
   const monthName = currentMonth.toLocaleString('default', {
     month: 'long',
@@ -164,46 +169,57 @@ export const SummaryScreen: React.FC = () => {
             <View style={[styles.statCard, { backgroundColor: COLORS.primary }]}>
               <Ionicons name="calendar" size={24} color="#fff" />
               <Text style={styles.statCardLabel}>Total Workouts</Text>
-              <Text style={styles.statCardValue}>{totalWorkouts}</Text>
-              <Text style={styles.statCardSubtext}>{monthPercentage}% of month</Text>
+              <Text style={styles.statCardValue}>{useDummyTrends ? 8 : totalWorkouts}</Text>
+              <Text style={styles.statCardSubtext}>
+                {useDummyTrends ? 'sample' : `${monthPercentage}% of month`}
+              </Text>
             </View>
 
             <View style={styles.statCard}>
               <Ionicons name="trophy" size={24} color={COLORS.accent} />
               <Text style={styles.statCardLabel}>Best Streak</Text>
-              <Text style={styles.statCardValue}>{bestStreak}</Text>
+              <Text style={styles.statCardValue}>{useDummyTrends ? 3 : bestStreak}</Text>
               <Text style={styles.statCardSubtext}>days in a row</Text>
             </View>
 
             <View style={styles.statCard}>
               <Ionicons name="trending-up" size={24} color={COLORS.success} />
               <Text style={styles.statCardLabel}>Weekly Avg</Text>
-              <Text style={styles.statCardValue}>{weeklyAverage}</Text>
+              <Text style={styles.statCardValue}>{useDummyTrends ? '2.1' : weeklyAverage}</Text>
               <Text style={styles.statCardSubtext}>workouts/week</Text>
             </View>
 
             <View style={styles.statCard}>
               <Ionicons name="list" size={24} color={COLORS.primary} />
               <Text style={styles.statCardLabel}>Consistency</Text>
-              <Text style={styles.statCardValue}>{consistencyScore}</Text>
-              <Text style={styles.statCardSubtext}>score</Text>
+              <Text style={styles.statCardValue}>{useDummyTrends ? 72 : consistencyScore}</Text>
+              <Text style={styles.statCardSubtext}>{useDummyTrends ? 'sample score' : 'score'}</Text>
             </View>
           </View>
 
           {/* Weekly Breakdown */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Weekly Breakdown</Text>
-            {totalWorkouts === 0 ? (
+            {useDummyTrends ? (
+              <Text style={styles.emptyText}>Sample trend: aim for 3–4 workouts per week. Log workouts to see your real breakdown.</Text>
+            ) : totalWorkouts === 0 ? (
               <Text style={styles.emptyText}>No workouts this month</Text>
             ) : (
-              <Text style={styles.emptyText}>Weekly breakdown chart</Text>
+              <Text style={styles.emptyText}>
+                {Math.ceil(monthDays / 7)} weeks • ~{weeklyAverage} workouts/week
+              </Text>
             )}
           </View>
 
           {/* Workout Days Distribution */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Workout Days Distribution</Text>
-            {Object.entries(dayCounts).map(([day, count]) => (
+            {useDummyTrends && (
+              <Text style={styles.distributionHint}>
+                Sample trend below. Log workouts to see your real distribution.
+              </Text>
+            )}
+            {Object.entries(displayDayCounts).map(([day, count]) => (
               <View key={day} style={styles.dayRow}>
                 <Text style={styles.dayName}>{day}</Text>
                 <View style={styles.dayBarContainer}>
@@ -280,28 +296,28 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: SIZES.md,
     flex: 1,
   },
   headerTitleContainer: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: FONTS.h1,
+    fontWeight: FONTS.bold,
     color: COLORS.text,
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: FONTS.caption,
     color: COLORS.textSecondary,
-    marginTop: 2,
+    marginTop: SIZES.xs,
   },
   headerRight: {
     flexDirection: 'row',
-    gap: 10,
+    gap: SIZES.sm,
   },
   headerButton: {
-    padding: 5,
+    padding: SIZES.xs,
   },
   modalOverlay: {
     flex: 1,
@@ -312,7 +328,7 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: COLORS.card,
     borderRadius: SIZES.borderRadius,
-    padding: 25,
+    padding: SIZES.xxl,
     width: '90%',
     maxHeight: '80%',
     borderWidth: 1,
@@ -322,28 +338,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: SIZES.xl,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: FONTS.h2,
+    fontWeight: FONTS.bold,
     color: COLORS.text,
   },
   loadingContainer: {
-    padding: 40,
+    padding: SIZES.xxl * 2,
     alignItems: 'center',
   },
   loadingText: {
     color: COLORS.textSecondary,
-    marginTop: 15,
-    fontSize: 14,
+    marginTop: SIZES.lg,
+    fontSize: FONTS.bodySmall,
   },
   aiResponseContainer: {
     maxHeight: 400,
   },
   aiResponseText: {
     color: COLORS.text,
-    fontSize: 15,
+    fontSize: FONTS.body,
     lineHeight: 24,
   },
   monthNav: {
@@ -352,102 +368,102 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.card,
     marginHorizontal: SIZES.padding,
-    marginBottom: 15,
-    padding: 15,
+    marginBottom: SIZES.lg,
+    padding: SIZES.lg,
     borderRadius: SIZES.borderRadius,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
   monthText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: FONTS.h3,
+    fontWeight: FONTS.bold,
     color: COLORS.text,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginHorizontal: SIZES.padding,
-    marginBottom: 15,
-    gap: 15,
+    marginBottom: SIZES.lg,
+    gap: SIZES.lg,
   },
   statCard: {
     width: '47%',
     backgroundColor: COLORS.card,
     borderRadius: SIZES.borderRadius,
-    padding: 20,
+    padding: SIZES.xl,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
   statCardLabel: {
-    fontSize: 12,
+    fontSize: FONTS.caption,
     color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 10,
-    marginBottom: 5,
+    marginTop: SIZES.sm,
+    marginBottom: SIZES.xs,
   },
   statCardValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: FONTS.display,
+    fontWeight: FONTS.bold,
     color: '#fff',
-    marginBottom: 5,
+    marginBottom: SIZES.xs,
   },
   statCardSubtext: {
-    fontSize: 11,
+    fontSize: FONTS.overline,
     color: 'rgba(255, 255, 255, 0.7)',
   },
   card: {
     backgroundColor: COLORS.card,
     marginHorizontal: SIZES.padding,
-    marginBottom: 15,
+    marginBottom: SIZES.lg,
     borderRadius: SIZES.borderRadius,
     padding: SIZES.cardPadding,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: FONTS.h3,
+    fontWeight: FONTS.bold,
     color: COLORS.text,
-    marginBottom: 15,
+    marginBottom: SIZES.lg,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: FONTS.bodySmall,
     color: COLORS.textSecondary,
     textAlign: 'center',
-    paddingVertical: 20,
+    paddingVertical: SIZES.xl,
   },
   dayRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    gap: 10,
+    marginBottom: SIZES.md,
+    gap: SIZES.sm,
   },
   dayName: {
     width: 40,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: FONTS.bodySmall,
+    fontWeight: FONTS.semibold,
     color: COLORS.text,
   },
   dayBarContainer: {
     flex: 1,
     height: 8,
     backgroundColor: COLORS.cardBorder,
-    borderRadius: 4,
+    borderRadius: SIZES.xs,
     overflow: 'hidden',
   },
   dayBar: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: SIZES.xs,
   },
   dayCount: {
     width: 30,
-    fontSize: 14,
+    fontSize: FONTS.bodySmall,
     color: COLORS.text,
     textAlign: 'right',
   },
   distributionHint: {
-    fontSize: 12,
+    fontSize: FONTS.caption,
     color: COLORS.textSecondary,
-    marginTop: 10,
+    marginTop: SIZES.sm,
     fontStyle: 'italic',
   },
 });

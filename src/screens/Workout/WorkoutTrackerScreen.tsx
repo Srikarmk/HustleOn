@@ -10,15 +10,19 @@ import {
 import { Calendar } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store';
-import { COLORS, SIZES } from '../../constants/theme';
+import { COLORS, FONTS, SIZES } from '../../constants/theme';
 
 export const WorkoutTrackerScreen: React.FC = () => {
   const {
     workouts,
     weeklyGoal,
     currentStreak,
+    supplements,
     setWeeklyGoal,
     addWorkout,
+    addSupplement,
+    removeSupplement,
+    toggleSupplementTaken,
     loadData,
   } = useStore();
 
@@ -57,6 +61,15 @@ export const WorkoutTrackerScreen: React.FC = () => {
 
   const totalWorkouts = workouts.length;
   const progress = weeklyGoal > 0 ? workoutsThisWeek / weeklyGoal : 0;
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const handleAddSupplement = () => {
+    addSupplement({
+      id: `sup-${Date.now()}`,
+      name: 'New Supplement',
+      takenToday: false,
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -65,7 +78,7 @@ export const WorkoutTrackerScreen: React.FC = () => {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <Ionicons name="barbell" size={24} color={COLORS.primary} />
+              <Ionicons name="barbell" size={SIZES.iconMd} color={COLORS.primary} />
               <View style={styles.headerTitleContainer}>
                 <Text style={styles.headerTitle}>Gym Tracker</Text>
                 <Text style={styles.headerSubtitle}>Build your fitness habit</Text>
@@ -74,12 +87,12 @@ export const WorkoutTrackerScreen: React.FC = () => {
             <View style={styles.headerRight}>
               <TouchableOpacity style={styles.headerButton}>
                 <View style={styles.streakBadge}>
-                  <Ionicons name="flame" size={20} color={COLORS.accent} />
+                  <Ionicons name="flame" size={SIZES.iconSm} color={COLORS.accent} />
                   <Text style={styles.streakText}>{currentStreak}</Text>
                 </View>
               </TouchableOpacity>
               <TouchableOpacity style={styles.headerButton}>
-                <Ionicons name="notifications-outline" size={24} color={COLORS.text} />
+                <Ionicons name="notifications-outline" size={SIZES.iconMd} color={COLORS.text} />
               </TouchableOpacity>
             </View>
           </View>
@@ -140,7 +153,7 @@ export const WorkoutTrackerScreen: React.FC = () => {
               <Text style={styles.statSubtext}>days</Text>
             </View>
             <View style={styles.statCard}>
-              <Ionicons name="barbell" size={24} color={COLORS.primary} />
+              <Ionicons name="barbell" size={SIZES.iconMd} color={COLORS.primary} />
               <Text style={styles.statLabel}>Total</Text>
               <Text style={styles.statValue}>{totalWorkouts}</Text>
               <Text style={styles.statSubtext}>workouts</Text>
@@ -151,8 +164,29 @@ export const WorkoutTrackerScreen: React.FC = () => {
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Supplement Tracker</Text>
             <View style={styles.supplementList}>
-              <TouchableOpacity style={styles.addSupplementButton}>
-                <Ionicons name="add-circle-outline" size={24} color={COLORS.primary} />
+              {supplements.map((sup) => (
+                <View key={sup.id} style={styles.supplementRow}>
+                  <TouchableOpacity
+                    style={styles.supplementCheck}
+                    onPress={() => toggleSupplementTaken(sup.id, todayStr)}
+                  >
+                    <Ionicons
+                      name={sup.date === todayStr && sup.takenToday ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={SIZES.iconSm}
+                      color={sup.date === todayStr && sup.takenToday ? COLORS.success : COLORS.textSecondary}
+                    />
+                  </TouchableOpacity>
+                  <Text style={styles.supplementName}>{sup.name}</Text>
+                  <TouchableOpacity
+                    onPress={() => removeSupplement(sup.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="close-circle-outline" size={SIZES.iconSm} color={COLORS.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TouchableOpacity style={styles.addSupplementButton} onPress={handleAddSupplement}>
+                <Ionicons name="add-circle-outline" size={SIZES.iconMd} color={COLORS.primary} />
                 <Text style={styles.addSupplementText}>Add Supplement</Text>
               </TouchableOpacity>
               <Text style={styles.supplementHint}>
@@ -227,49 +261,49 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: SIZES.md,
     flex: 1,
   },
   headerTitleContainer: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: FONTS.h1,
+    fontWeight: FONTS.bold,
     color: COLORS.text,
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: FONTS.caption,
     color: COLORS.textSecondary,
-    marginTop: 2,
+    marginTop: SIZES.xs,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 15,
+    gap: SIZES.lg,
   },
   headerButton: {
-    padding: 5,
+    padding: SIZES.xs,
   },
   streakBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: SIZES.sm,
     backgroundColor: COLORS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: SIZES.md,
+    paddingVertical: SIZES.sm,
+    borderRadius: SIZES.xl,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
   streakText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: FONTS.body,
+    fontWeight: FONTS.bold,
     color: COLORS.accent,
   },
   workoutButtonContainer: {
     marginHorizontal: SIZES.padding,
-    marginBottom: 15,
+    marginBottom: SIZES.lg,
   },
   workoutTodayButton: {
     borderRadius: SIZES.borderRadius,
@@ -279,21 +313,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: 30,
-    gap: 10,
+    paddingVertical: SIZES.lg,
+    paddingHorizontal: SIZES.xl,
+    gap: SIZES.sm,
     backgroundColor: COLORS.button,
     borderRadius: SIZES.borderRadius,
   },
   workoutTodayButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: FONTS.h3,
+    fontWeight: FONTS.bold,
   },
   card: {
     backgroundColor: COLORS.card,
     marginHorizontal: SIZES.padding,
-    marginBottom: 15,
+    marginBottom: SIZES.lg,
     borderRadius: SIZES.borderRadius,
     padding: SIZES.cardPadding,
     borderWidth: 1,
@@ -301,107 +335,124 @@ const styles = StyleSheet.create({
   },
   goalCardHighlight: {
     borderRadius: SIZES.borderRadius,
-    padding: 20,
+    padding: SIZES.xl,
     backgroundColor: COLORS.highlight,
   },
   goalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: SIZES.lg,
   },
   goalTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SIZES.sm,
   },
   goalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: FONTS.body,
+    fontWeight: FONTS.semibold,
     color: '#fff',
   },
   changeButton: {
-    fontSize: 14,
+    fontSize: FONTS.bodySmall,
     color: COLORS.primary,
-    fontWeight: '600',
+    fontWeight: FONTS.semibold,
   },
   goalValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: FONTS.display,
+    fontWeight: FONTS.bold,
     color: '#fff',
-    marginBottom: 15,
+    marginBottom: SIZES.lg,
   },
   progressBarContainer: {
     height: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 3,
-    marginBottom: 10,
+    borderRadius: SIZES.xs,
+    marginBottom: SIZES.sm,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
     backgroundColor: COLORS.accent,
-    borderRadius: 3,
+    borderRadius: SIZES.xs,
   },
   goalSubtext: {
-    fontSize: 14,
+    fontSize: FONTS.bodySmall,
     color: '#fff',
     opacity: 0.9,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 15,
+    gap: SIZES.lg,
     marginHorizontal: SIZES.padding,
-    marginBottom: 15,
+    marginBottom: SIZES.lg,
   },
   statCard: {
     flex: 1,
     backgroundColor: COLORS.card,
     borderRadius: SIZES.borderRadius,
-    padding: 20,
+    padding: SIZES.xl,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: FONTS.bodySmall,
     color: COLORS.textSecondary,
-    marginTop: 10,
-    marginBottom: 5,
+    marginTop: SIZES.sm,
+    marginBottom: SIZES.xs,
   },
   statValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: FONTS.display,
+    fontWeight: FONTS.bold,
     color: COLORS.text,
-    marginBottom: 5,
+    marginBottom: SIZES.xs,
   },
   statSubtext: {
-    fontSize: 12,
+    fontSize: FONTS.caption,
     color: COLORS.textSecondary,
   },
   calendar: {
     borderRadius: SIZES.borderRadius,
   },
   calendarHint: {
-    fontSize: 12,
+    fontSize: FONTS.caption,
     color: COLORS.textSecondary,
     textAlign: 'center',
-    marginTop: 15,
+    marginTop: SIZES.lg,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: FONTS.h3,
+    fontWeight: FONTS.bold,
     color: COLORS.text,
-    marginBottom: 15,
+    marginBottom: SIZES.lg,
   },
   supplementList: {
+    alignItems: 'stretch',
+    gap: SIZES.sm,
+  },
+  supplementRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: SIZES.sm,
+    paddingVertical: SIZES.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+  },
+  supplementCheck: {
+    padding: SIZES.xs,
+  },
+  supplementName: {
+    flex: 1,
+    fontSize: FONTS.body,
+    color: COLORS.text,
   },
   addSupplementButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    padding: 15,
+    gap: SIZES.sm,
+    padding: SIZES.lg,
     backgroundColor: COLORS.background,
     borderRadius: SIZES.borderRadius,
     borderWidth: 1,
@@ -411,14 +462,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addSupplementText: {
-    fontSize: 16,
+    fontSize: FONTS.body,
     color: COLORS.primary,
-    fontWeight: '600',
+    fontWeight: FONTS.semibold,
   },
   supplementHint: {
-    fontSize: 12,
+    fontSize: FONTS.caption,
     color: COLORS.textSecondary,
-    marginTop: 10,
+    marginTop: SIZES.sm,
     textAlign: 'center',
   },
 });

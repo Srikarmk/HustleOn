@@ -19,7 +19,7 @@ import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 import { useStore } from '../../store';
-import { COLORS, SIZES } from '../../constants/theme';
+import { COLORS, FONTS, SIZES } from '../../constants/theme';
 import { storage } from '../../utils/storage';
 import { Goal, Integration } from '../../types';
 
@@ -959,7 +959,7 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: SIZES.md,
     flex: 1,
   },
   avatarContainer: {
@@ -983,9 +983,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: SIZES.iconSm,
+    height: SIZES.iconSm,
+    borderRadius: SIZES.iconSm / 2,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -996,55 +996,55 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: FONTS.h1,
+    fontWeight: FONTS.bold,
     color: COLORS.text,
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: FONTS.caption,
     color: COLORS.textSecondary,
-    marginTop: 2,
+    marginTop: SIZES.xs,
   },
   headerButton: {
-    padding: 5,
+    padding: SIZES.xs,
   },
   card: {
     backgroundColor: COLORS.card,
     marginHorizontal: SIZES.padding,
-    marginBottom: 15,
+    marginBottom: SIZES.lg,
     borderRadius: SIZES.borderRadius,
     padding: SIZES.cardPadding,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: FONTS.h3,
+    fontWeight: FONTS.bold,
     color: COLORS.text,
-    marginBottom: 20,
+    marginBottom: SIZES.xl,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: SIZES.xl,
   },
   inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: FONTS.bodySmall,
+    fontWeight: FONTS.semibold,
     color: COLORS.text,
-    marginBottom: 10,
+    marginBottom: SIZES.sm,
   },
   input: {
     backgroundColor: COLORS.background,
     borderRadius: SIZES.borderRadius,
-    padding: 15,
+    padding: SIZES.lg,
     color: COLORS.text,
-    fontSize: 16,
+    fontSize: FONTS.body,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
   unitRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
+    gap: SIZES.sm,
+    marginBottom: SIZES.xl,
   },
   unitButton: {
     flex: 1,
@@ -1053,7 +1053,7 @@ const styles = StyleSheet.create({
   },
   unitButtonActive: {},
   unitButtonGradient: {
-    padding: 15,
+    padding: SIZES.lg,
     alignItems: 'center',
     backgroundColor: COLORS.cardLight,
     borderRadius: SIZES.borderRadius,

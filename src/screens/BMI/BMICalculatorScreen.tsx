@@ -666,7 +666,7 @@ export const BMICalculatorScreen: React.FC = () => {
           {/* Trends Tab */}
           {activeTab === 'trends' && (
             <View style={styles.tabContent}>
-              {bmiRecords.length >= 2 && (
+              {bmiRecords.length >= 2 ? (
                 <>
                   <View style={styles.card}>
                     <Text style={styles.sectionTitle}>Weight Trend (7-day moving average)</Text>
@@ -700,6 +700,38 @@ export const BMICalculatorScreen: React.FC = () => {
                       </View>
                     </View>
                   )}
+                </>
+              ) : (
+                <>
+                  <View style={styles.card}>
+                    <Text style={styles.sectionTitle}>Weight Trend (7-day moving average)</Text>
+                    <Text style={styles.dummyTrendHint}>Sample trend. Add 2+ BMI/weight entries to see your real trend.</Text>
+                    <View style={styles.trendContainer}>
+                      {[78, 77.2, 76.8, 76.2, 75.8, 75.2, 74.8].map((weight, index) => {
+                        const minW = 74.8;
+                        const maxW = 78;
+                        const height = ((weight - minW) / (maxW - minW)) * 100;
+                        return (
+                          <View key={index} style={styles.trendBar}>
+                            <View style={[styles.trendBarFill, { height: `${height}%` }]} />
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                  <View style={styles.card}>
+                    <View style={styles.predictionCard}>
+                      <Ionicons name="calendar" size={20} color={COLORS.primary} />
+                      <View>
+                        <Text style={styles.predictionText}>
+                          Sample: Predicted goal achievement in ~45 days (add weight data for real prediction)
+                        </Text>
+                        <Text style={styles.predictionDate}>
+                          Target: Log 2+ weight entries to see your trajectory
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
                 </>
               )}
             </View>
@@ -1288,6 +1320,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.text,
+  },
+  dummyTrendHint: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   trendContainer: {
     flexDirection: 'row',

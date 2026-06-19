@@ -109,10 +109,18 @@ export interface Friend {
   connectedAt: string;
 }
 
+export interface Supplement {
+  id: string;
+  name: string;
+  takenToday: boolean;
+  date?: string;
+}
+
 export interface AppState {
   userProfile: UserProfile | null;
   workouts: Workout[];
   meals: Meal[];
+  supplements: Supplement[];
   bmiRecords: BMIRecord[];
   bodyMeasurements: BodyMeasurement[];
   progressPhotos: ProgressPhoto[];
@@ -130,6 +138,9 @@ export interface AppState {
   removeWorkout: (id: string) => void;
   addMeal: (meal: Meal) => void;
   removeMeal: (id: string) => void;
+  addSupplement: (supplement: Supplement) => void;
+  removeSupplement: (id: string) => void;
+  toggleSupplementTaken: (id: string, date: string) => void;
   addBMIRecord: (record: BMIRecord) => void;
   addBodyMeasurement: (measurement: BodyMeasurement) => void;
   addProgressPhoto: (photo: ProgressPhoto) => void;

@@ -16,9 +16,38 @@ export const COLORS = {
   highlight: '#7864b4', // Solid purple for highlighted blocks only
 };
 
+/** Typography scale – use these for consistent font sizes across the app */
+export const FONTS = {
+  /** Large display numbers (e.g. stats, goals) */
+  display: 28,
+  h1: 26,
+  h2: 22,
+  h3: 18,
+  body: 16,
+  bodySmall: 14,
+  caption: 12,
+  overline: 11,
+  /** Font weights */
+  bold: '700' as const,
+  semibold: '600' as const,
+  medium: '500' as const,
+  regular: '400' as const,
+};
+
 export const SIZES = {
   padding: 20,
-  borderRadius: 15,
-  cardPadding: 20,
+  borderRadius: 12,
+  cardPadding: 18,
+  /** Spacing scale for margins and gaps */
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  /** Icon sizes */
+  iconSm: 20,
+  iconMd: 24,
+  iconLg: 28,
 };
 
