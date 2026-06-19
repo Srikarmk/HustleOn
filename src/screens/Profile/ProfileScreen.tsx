@@ -14,14 +14,15 @@ import {
   Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 import { useStore } from '../../store';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
-import { storage } from '../../utils/storage';
-import { Goal, Integration } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import { scheduleAllNotifications } from '../../utils/notifications';
+import { Goal, Integration, NotificationPreference } from '../../types';
 
 interface UserProfile {
   name: string;
@@ -33,24 +34,27 @@ interface UserProfile {
   unit: 'metric' | 'imperial';
   dietaryPreference?: string;
   profilePictureUri?: string;
+  gender?: 'male' | 'female';
   notifications: boolean;
   darkMode: boolean;
 }
 
 export const ProfileScreen: React.FC = () => {
+  const { signOut } = useAuth();
   const store = useStore();
-  const { 
-    weeklyGoal, 
-    calorieGoal, 
-    setWeeklyGoal, 
-    setCalorieGoal, 
-    loadData, 
+  const {
+    weeklyGoal,
+    calorieGoal,
+    setWeeklyGoal,
+    setCalorieGoal,
+    loadData,
     goals,
     integrations,
     notificationPreferences,
     privacySettings,
     themeSettings,
     friends,
+    currentStreak,
     addGoal,
     updateGoal,
     removeGoal,
@@ -73,6 +77,7 @@ export const ProfileScreen: React.FC = () => {
     unit: 'metric',
     dietaryPreference: '',
     profilePictureUri: '',
+    gender: undefined,
     notifications: true,
     darkMode: true,
   });
@@ -122,20 +127,32 @@ export const ProfileScreen: React.FC = () => {
         unit: store.userProfile.unit || 'metric',
         dietaryPreference: store.userProfile.dietaryPreference || '',
         profilePictureUri: store.userProfile.profilePictureUri || '',
+        gender: store.userProfile.gender,
         notifications: true,
         darkMode: true,
       });
     }
   };
 
-  const saveProfile = async () => {
-    // Save profile to AsyncStorage
-    // Implementation can be added later
+  const saveProfile = () => {
+    store.setUserProfile({
+      name: profile.name,
+      age: profile.age,
+      dateOfBirth: profile.dateOfBirth,
+      weight: profile.weight,
+      height: profile.height,
+      unit: profile.unit,
+      dietaryPreference: profile.dietaryPreference,
+      profilePictureUri: profile.profilePictureUri,
+      gender: profile.gender,
+    });
+    if (themeSettings.darkMode !== profile.darkMode) {
+      updateThemeSettings({ darkMode: profile.darkMode });
+    }
   };
 
   const updateProfile = (field: keyof UserProfile, value: any) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
-    saveProfile();
   };
 
   const pickProfilePicture = async () => {
@@ -164,33 +181,13 @@ export const ProfileScreen: React.FC = () => {
     }
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     Alert.alert(
       'Logout',
-      'Are you sure you want to logout? This will reset your onboarding and you\'ll need to sign in again.',
+      'Are you sure you want to logout?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await storage.logout();
-              // Show success message
-              Alert.alert(
-                'Logged Out',
-                'You have been logged out successfully. Please close and reopen the app to see the onboarding screens again.',
-                [{ text: 'OK' }]
-              );
-            } catch (error) {
-              console.error('Error during logout:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
-            }
-          },
-        },
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', style: 'destructive', onPress: () => { signOut(); } },
       ]
     );
   };
@@ -259,7 +256,6 @@ export const ProfileScreen: React.FC = () => {
 
   // Connect Integration
   const connectIntegration = async (integration: Integration) => {
-    // In a real app, this would open OAuth flow
     Alert.alert(
       'Connect ' + integration.name,
       `This would open ${integration.name} authentication. For now, this is a placeholder.`,
@@ -277,6 +273,14 @@ export const ProfileScreen: React.FC = () => {
         },
       ]
     );
+  };
+
+  const handleNotifToggle = (type: string, value: boolean) => {
+    updateNotificationPreference(type, { enabled: value });
+    const updated = notificationPreferences.map((p) =>
+      p.type === type ? { ...p, enabled: value } : p
+    );
+    scheduleAllNotifications(updated, currentStreak).catch(console.error);
   };
 
   return (
@@ -346,6 +350,33 @@ export const ProfileScreen: React.FC = () => {
                 onChangeText={(value) => updateProfile('age', value)}
                 keyboardType="numeric"
               />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Gender</Text>
+              <Text style={styles.settingSubtext}>Used for body-fat estimates</Text>
+              <View style={styles.unitRow}>
+                <TouchableOpacity
+                  style={styles.unitButton}
+                  onPress={() => updateProfile('gender', 'male')}
+                >
+                  <View style={[styles.unitButtonGradient, profile.gender === 'male' && styles.unitButtonGradientActive]}>
+                    <Text style={[styles.unitButtonText, profile.gender === 'male' && styles.unitButtonTextActive]}>
+                      Male
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.unitButton}
+                  onPress={() => updateProfile('gender', 'female')}
+                >
+                  <View style={[styles.unitButtonGradient, profile.gender === 'female' && styles.unitButtonGradientActive]}>
+                    <Text style={[styles.unitButtonText, profile.gender === 'female' && styles.unitButtonTextActive]}>
+                      Female
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {profile.dateOfBirth && (
@@ -523,18 +554,32 @@ export const ProfileScreen: React.FC = () => {
                         </Text>
                       </View>
                     </View>
-                    <TouchableOpacity onPress={() => {
-                      setEditingGoal(goal);
-                      setGoalForm({
-                        type: goal.type,
-                        title: goal.title,
-                        targetValue: goal.targetValue.toString(),
-                        targetDate: goal.targetDate,
-                      });
-                      setShowGoalModal(true);
-                    }}>
-                      <Ionicons name="create-outline" size={20} color={COLORS.textSecondary} />
-                    </TouchableOpacity>
+                    <View style={styles.goalCardActions}>
+                      <TouchableOpacity onPress={() => {
+                        setEditingGoal(goal);
+                        setGoalForm({
+                          type: goal.type,
+                          title: goal.title,
+                          targetValue: goal.targetValue.toString(),
+                          targetDate: goal.targetDate,
+                        });
+                        setShowGoalModal(true);
+                      }}>
+                        <Ionicons name="create-outline" size={20} color={COLORS.textSecondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => {
+                        Alert.alert(
+                          'Delete Goal',
+                          `Delete "${goal.title}"?`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Delete', style: 'destructive', onPress: () => removeGoal(goal.id) },
+                          ]
+                        );
+                      }}>
+                        <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   {goal.currentValue && (
                     <View style={styles.goalProgress}>
@@ -625,7 +670,7 @@ export const ProfileScreen: React.FC = () => {
                 </View>
                 <Switch
                   value={pref.enabled}
-                  onValueChange={(value) => updateNotificationPreference(pref.type, { enabled: value })}
+                  onValueChange={(value) => handleNotifToggle(pref.type, value)}
                   trackColor={{ false: COLORS.cardBorder, true: COLORS.primary }}
                   thumbColor="#fff"
                 />
@@ -832,7 +877,7 @@ export const ProfileScreen: React.FC = () => {
           </View>
 
           {/* Save Button */}
-          <TouchableOpacity style={styles.saveButton}>
+          <TouchableOpacity style={styles.saveButton} onPress={saveProfile}>
             <View style={styles.saveButtonGradient}>
               <Text style={styles.saveButtonText}>Save Changes</Text>
             </View>
@@ -1171,28 +1216,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.error,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: COLORS.card,
-    borderRadius: SIZES.borderRadius,
-    padding: 25,
-    width: '90%',
-    maxHeight: '80%',
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
   modalInput: {
     backgroundColor: COLORS.background,
     borderRadius: SIZES.borderRadius,
@@ -1341,6 +1364,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.text,
+    marginBottom: 20,
+    textAlign: 'center',
   },
   loadingContainer: {
     padding: 40,
@@ -1468,6 +1493,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 10,
+  },
+  goalCardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   goalCardInfo: {
     flexDirection: 'row',

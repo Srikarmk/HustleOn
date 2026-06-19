@@ -1,20 +1,19 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppState, Workout, Meal, Supplement, BMIRecord, UserProfile, BodyMeasurement, ProgressPhoto, Goal, Integration, NotificationPreference, PrivacySettings, ThemeSettings, Friend } from '../types';
+import { AppState, Workout, Meal, BMIRecord, UserProfile, BodyMeasurement, ProgressPhoto, Goal, Integration, NotificationPreference, PrivacySettings, ThemeSettings, Friend, Supplement, RemoteSnapshot } from '../types';
 
 const STORAGE_KEY = '@hustleon:app_data';
 
 const DEFAULT_SUPPLEMENTS: Supplement[] = [
-  { id: 'sup-1', name: 'Vitamin D', takenToday: false },
-  { id: 'sup-2', name: 'Multivitamin', takenToday: false },
-  { id: 'sup-3', name: 'Protein', takenToday: false },
+  { id: 'sup-1', name: 'Vitamin D', takenDates: [] },
+  { id: 'sup-2', name: 'Multivitamin', takenDates: [] },
+  { id: 'sup-3', name: 'Protein', takenDates: [] },
 ];
 
 export const useStore = create<AppState>((set, get) => ({
   userProfile: null,
   workouts: [],
   meals: [],
-  supplements: [],
   bmiRecords: [],
   bodyMeasurements: [],
   progressPhotos: [],
@@ -45,9 +44,11 @@ export const useStore = create<AppState>((set, get) => ({
     layout: 'comfortable',
   },
   friends: [],
+  supplements: [],
   weeklyGoal: 3,
   calorieGoal: 2000,
   currentStreak: 0,
+  dataUpdatedAt: '1970-01-01T00:00:00.000Z',
 
   setUserProfile: (profile) => {
     set({ userProfile: profile });
@@ -76,33 +77,6 @@ export const useStore = create<AppState>((set, get) => ({
   removeMeal: (id) => {
     set((state) => ({
       meals: state.meals.filter((m) => m.id !== id),
-    }));
-    get().saveData();
-  },
-
-  addSupplement: (supplement) => {
-    set((state) => ({ supplements: [...state.supplements, supplement] }));
-    get().saveData();
-  },
-
-  removeSupplement: (id) => {
-    set((state) => ({
-      supplements: state.supplements.filter((s) => s.id !== id),
-    }));
-    get().saveData();
-  },
-
-  toggleSupplementTaken: (id, date) => {
-    set((state) => ({
-      supplements: state.supplements.map((s) => {
-        if (s.id !== id) return s;
-        const isSameDay = s.date === date;
-        return {
-          ...s,
-          date,
-          takenToday: isSameDay ? !s.takenToday : true,
-        };
-      }),
     }));
     get().saveData();
   },
@@ -190,6 +164,34 @@ export const useStore = create<AppState>((set, get) => ({
     get().saveData();
   },
 
+  addSupplement: (supplement) => {
+    set((state) => ({ supplements: [...state.supplements, supplement] }));
+    get().saveData();
+  },
+
+  removeSupplement: (id) => {
+    set((state) => ({
+      supplements: state.supplements.filter((s) => s.id !== id),
+    }));
+    get().saveData();
+  },
+
+  toggleSupplementTaken: (id, date) => {
+    set((state) => ({
+      supplements: state.supplements.map((s) => {
+        if (s.id !== id) return s;
+        const taken = s.takenDates.includes(date);
+        return {
+          ...s,
+          takenDates: taken
+            ? s.takenDates.filter((d) => d !== date)
+            : [...s.takenDates, date],
+        };
+      }),
+    }));
+    get().saveData();
+  },
+
   setWeeklyGoal: (goal) => {
     set({ weeklyGoal: goal });
     get().saveData();
@@ -207,25 +209,37 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
 
-    const sortedWorkouts = [...workouts].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    const DAY = 1000 * 60 * 60 * 24;
 
+    // Unique workout days (midnight timestamps), most recent first
+    const uniqueDays = Array.from(
+      new Set(
+        workouts.map((w) => {
+          const d = new Date(w.date);
+          d.setHours(0, 0, 0, 0);
+          return d.getTime();
+        })
+      )
+    ).sort((a, b) => b - a);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Streak is only "alive" if the most recent workout was today or yesterday.
+    const daysSinceLast = Math.floor((today.getTime() - uniqueDays[0]) / DAY);
+    if (daysSinceLast > 1) {
+      set({ currentStreak: 0 });
+      return;
+    }
+
+    // Count consecutive days backwards from the most recent workout.
     let streak = 0;
-    let currentDate = new Date();
-    currentDate.setHours(0, 0, 0, 0);
-
-    for (const workout of sortedWorkouts) {
-      const workoutDate = new Date(workout.date);
-      workoutDate.setHours(0, 0, 0, 0);
-
-      const diffDays = Math.floor(
-        (currentDate.getTime() - workoutDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      if (diffDays === streak) {
+    let expected = uniqueDays[0];
+    for (const day of uniqueDays) {
+      if (day === expected) {
         streak++;
-      } else if (diffDays > streak) {
+        expected -= DAY;
+      } else {
         break;
       }
     }
@@ -275,6 +289,7 @@ export const useStore = create<AppState>((set, get) => ({
           friends: parsed.friends || [],
           weeklyGoal: parsed.weeklyGoal || 3,
           calorieGoal: parsed.calorieGoal || 2000,
+          dataUpdatedAt: parsed.dataUpdatedAt || '1970-01-01T00:00:00.000Z',
         });
         get().updateStreak();
       }
@@ -285,12 +300,15 @@ export const useStore = create<AppState>((set, get) => ({
 
   saveData: async () => {
     try {
+      // A local mutation just happened — advance the sync clock so this
+      // device wins the next last-write-wins reconciliation.
+      const now = new Date().toISOString();
+      set({ dataUpdatedAt: now });
       const state = get();
       const dataToSave = {
         userProfile: state.userProfile,
         workouts: state.workouts,
         meals: state.meals,
-        supplements: state.supplements,
         bmiRecords: state.bmiRecords,
         bodyMeasurements: state.bodyMeasurements,
         progressPhotos: state.progressPhotos,
@@ -300,12 +318,62 @@ export const useStore = create<AppState>((set, get) => ({
         privacySettings: state.privacySettings,
         themeSettings: state.themeSettings,
         friends: state.friends,
+        supplements: state.supplements,
         weeklyGoal: state.weeklyGoal,
         calorieGoal: state.calorieGoal,
+        dataUpdatedAt: now,
       };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
     } catch (error) {
       console.error('Failed to save data:', error);
+    }
+  },
+
+  applyRemoteState: async (data: RemoteSnapshot, remoteUpdatedAt: string) => {
+    // Replace local state with a remote snapshot pulled during sync.
+    // Persist with the remote clock value — do NOT bump (this isn't a local edit).
+    set({
+      userProfile: data.userProfile,
+      workouts: data.workouts,
+      meals: data.meals,
+      bmiRecords: data.bmiRecords,
+      bodyMeasurements: data.bodyMeasurements,
+      progressPhotos: data.progressPhotos,
+      goals: data.goals,
+      integrations: data.integrations,
+      notificationPreferences: data.notificationPreferences,
+      privacySettings: data.privacySettings,
+      themeSettings: data.themeSettings,
+      friends: data.friends,
+      supplements: data.supplements,
+      weeklyGoal: data.weeklyGoal,
+      calorieGoal: data.calorieGoal,
+      dataUpdatedAt: remoteUpdatedAt,
+    });
+    get().updateStreak();
+    try {
+      const state = get();
+      const dataToSave = {
+        userProfile: state.userProfile,
+        workouts: state.workouts,
+        meals: state.meals,
+        bmiRecords: state.bmiRecords,
+        bodyMeasurements: state.bodyMeasurements,
+        progressPhotos: state.progressPhotos,
+        goals: state.goals,
+        integrations: state.integrations,
+        notificationPreferences: state.notificationPreferences,
+        privacySettings: state.privacySettings,
+        themeSettings: state.themeSettings,
+        friends: state.friends,
+        supplements: state.supplements,
+        weeklyGoal: state.weeklyGoal,
+        calorieGoal: state.calorieGoal,
+        dataUpdatedAt: remoteUpdatedAt,
+      };
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+    } catch (error) {
+      console.error('Failed to persist remote state:', error);
     }
   },
 }));

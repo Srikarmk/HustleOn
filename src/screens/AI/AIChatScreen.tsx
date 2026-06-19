@@ -14,8 +14,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SIZES } from '../../constants/theme';
-import { generateGeminiResponse, FITNESS_COACH_PROMPT } from '../../config/gemini';
+import { generateGeminiResponse, FITNESS_COACH_PROMPT, ChatTurn } from '../../config/gemini';
 
 interface Message {
   id: string;
@@ -24,18 +25,49 @@ interface Message {
   timestamp: Date;
 }
 
+const CHAT_STORAGE_KEY = '@hustleon:ai_chat';
+
+const WELCOME_MESSAGE: Message = {
+  id: '1',
+  text: "Hello! I'm your fitness coach assistant. I'm here to help you with exercise advice, nutrition tips, workout plans, and answer any fitness-related questions you have. What would you like to know?",
+  isUser: false,
+  timestamp: new Date(),
+};
+
 export const AIChatScreen: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: "Hello! I'm your fitness coach assistant. I'm here to help you with exercise advice, nutrition tips, workout plans, and answer any fitness-related questions you have. What would you like to know?",
-      isUser: false,
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Load persisted conversation on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem(CHAT_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved) as Message[];
+          if (parsed.length > 0) {
+            setMessages(parsed.map((m) => ({ ...m, timestamp: new Date(m.timestamp) })));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      } finally {
+        setHistoryLoaded(true);
+      }
+    })();
+  }, []);
+
+  // Persist conversation whenever it changes (after initial load)
+  useEffect(() => {
+    if (historyLoaded) {
+      AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages)).catch((error) =>
+        console.error('Failed to save chat history:', error)
+      );
+    }
+  }, [messages, historyLoaded]);
 
   useEffect(() => {
     // Scroll to bottom when new message is added
@@ -43,6 +75,21 @@ export const AIChatScreen: React.FC = () => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
   }, [messages]);
+
+  const handleNewChat = () => {
+    Alert.alert(
+      'New Chat',
+      'Start a new conversation? This clears the current chat.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'New Chat',
+          style: 'destructive',
+          onPress: () => setMessages([{ ...WELCOME_MESSAGE, timestamp: new Date() }]),
+        },
+      ]
+    );
+  };
 
   const handleSend = async () => {
     if (!inputText.trim() || isLoading) return;
@@ -54,12 +101,22 @@ export const AIChatScreen: React.FC = () => {
       timestamp: new Date(),
     };
 
+    // Capture prior turns (before this message) for multi-turn context.
+    // Cap to the last 20 turns to keep the payload bounded.
+    const history: ChatTurn[] = messages
+      .slice(-20)
+      .map((m) => ({ role: m.isUser ? 'user' : 'model', text: m.text }));
+
     setMessages((prev) => [...prev, userMessage]);
     setInputText('');
     setIsLoading(true);
 
     try {
-      const response = await generateGeminiResponse(inputText.trim(), FITNESS_COACH_PROMPT);
+      const response = await generateGeminiResponse(
+        inputText.trim(),
+        FITNESS_COACH_PROMPT,
+        history
+      );
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -96,14 +153,11 @@ export const AIChatScreen: React.FC = () => {
             <Text style={styles.headerSubtitle}>Your Fitness Coach</Text>
           </View>
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.historyButton}
-          onPress={() => {
-            // TODO: Implement chat history view
-            Alert.alert('Chat History', 'Chat history feature coming soon!');
-          }}
+          onPress={handleNewChat}
         >
-          <Ionicons name="time-outline" size={24} color={COLORS.primary} />
+          <Ionicons name="create-outline" size={24} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 

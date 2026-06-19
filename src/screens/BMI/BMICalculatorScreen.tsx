@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../../store';
 import { COLORS, SIZES } from '../../constants/theme';
@@ -28,8 +29,10 @@ export const BMICalculatorScreen: React.FC = () => {
     progressPhotos,
     addBodyMeasurement,
     addProgressPhoto,
-    loadData,
+    userProfile,
+    goals,
   } = useStore();
+  const navigation = useNavigation<any>();
 
   const [unit, setUnit] = useState<'metric' | 'imperial'>('metric');
   const [weight, setWeight] = useState('');
@@ -57,10 +60,6 @@ export const BMICalculatorScreen: React.FC = () => {
 
   // Active Tab State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'photos' | 'measurements' | 'trends'>('dashboard');
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   const calculateBMI = () => {
     const w = parseFloat(weight);
@@ -96,13 +95,13 @@ export const BMICalculatorScreen: React.FC = () => {
 
     if (latestMeasurements?.waist) {
       waistCircumference = latestMeasurements.waist;
-      // Simplified body fat calculation
-      if (unit === 'metric') {
-        const heightM = h / 100;
-        bodyFatPercent = (1.20 * calculatedBMI) + (0.23 * 30) - (10.8 * 1) - 5.4; // Assuming male for demo
-        if (bodyFatPercent < 0) bodyFatPercent = 0;
-        if (bodyFatPercent > 50) bodyFatPercent = 50;
-      }
+      // Deurenberg body-fat estimate from BMI, using the user's real age & gender.
+      // BF% = 1.20*BMI + 0.23*age - 10.8*sex - 5.4   (sex: male=1, female=0)
+      const age = userProfile?.age ? parseInt(userProfile.age, 10) : 30;
+      const sex = userProfile?.gender === 'female' ? 0 : 1;
+      bodyFatPercent = 1.2 * calculatedBMI + 0.23 * age - 10.8 * sex - 5.4;
+      if (bodyFatPercent < 0) bodyFatPercent = 0;
+      if (bodyFatPercent > 50) bodyFatPercent = 50;
     }
 
     if (bodyFatPercent) {
@@ -296,6 +295,10 @@ export const BMICalculatorScreen: React.FC = () => {
     return sorted[0];
   };
 
+  // Trajectory prediction uses the user's actual weight goal (if any)
+  const weightGoal = goals.find((g) => g.type === 'weight');
+  const trajectory = weightGoal ? predictTrajectory(bmiRecords, weightGoal.targetValue) : null;
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.gradient}>
@@ -309,7 +312,10 @@ export const BMICalculatorScreen: React.FC = () => {
                 <Text style={styles.headerSubtitle}>Comprehensive body metrics & progress</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.headerButton}>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => navigation.navigate('Profile')}
+            >
               <Ionicons name="notifications-outline" size={24} color={COLORS.text} />
             </TouchableOpacity>
           </View>
@@ -575,7 +581,8 @@ export const BMICalculatorScreen: React.FC = () => {
                     <Text style={styles.sectionSubtitle}>Photo Timeline</Text>
                     <FlatList
                       horizontal
-                      data={progressPhotos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())}
+                      nestedScrollEnabled
+                      data={[...progressPhotos].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())}
                       keyExtractor={(item) => item.id}
                       showsHorizontalScrollIndicator={false}
                       renderItem={({ item, index }) => (
@@ -685,16 +692,16 @@ export const BMICalculatorScreen: React.FC = () => {
                     </View>
                   </View>
 
-                  {predictTrajectory(bmiRecords, 70) && (
+                  {trajectory && (
                     <View style={styles.card}>
                       <View style={styles.predictionCard}>
                         <Ionicons name="calendar" size={20} color={COLORS.primary} />
                         <View>
                           <Text style={styles.predictionText}>
-                            Predicted goal achievement: {predictTrajectory(bmiRecords, 70)!.days} days
+                            Predicted goal achievement: {trajectory.days} days
                           </Text>
                           <Text style={styles.predictionDate}>
-                            Target date: {new Date(predictTrajectory(bmiRecords, 70)!.date).toLocaleDateString()}
+                            Target date: {new Date(trajectory.date).toLocaleDateString()}
                           </Text>
                         </View>
                       </View>
@@ -877,7 +884,7 @@ export const BMICalculatorScreen: React.FC = () => {
             <View style={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}>
               <Image
                 source={{
-                  uri: progressPhotos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[
+                  uri: [...progressPhotos].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[
                     selectedPhotoIndex
                   ]?.uri,
                 }}

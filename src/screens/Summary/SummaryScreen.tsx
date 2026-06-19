@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,20 +10,18 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useStore } from '../../store';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
 import { generateGeminiResponse } from '../../config/gemini';
 
 export const SummaryScreen: React.FC = () => {
-  const { workouts, meals, loadData } = useStore();
+  const { workouts, meals } = useStore();
+  const navigation = useNavigation<any>();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiResponse, setAiResponse] = useState('');
   const [isAILoading, setIsAILoading] = useState(false);
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   const monthStart = new Date(
     currentMonth.getFullYear(),
@@ -95,6 +93,16 @@ export const SummaryScreen: React.FC = () => {
     : dayCounts;
   const maxDayCount = Math.max(...Object.values(displayDayCounts), 1);
 
+  // Weekly breakdown: bucket workouts into weeks of the month (1-7, 8-14, ...)
+  const numWeeks = Math.ceil(monthDays / 7);
+  const weeklyBreakdown = Array(numWeeks).fill(0) as number[];
+  monthWorkouts.forEach((workout) => {
+    const dayOfMonth = new Date(workout.date).getDate();
+    const weekIndex = Math.min(numWeeks - 1, Math.floor((dayOfMonth - 1) / 7));
+    weeklyBreakdown[weekIndex]++;
+  });
+  const maxWeekCount = Math.max(...weeklyBreakdown, 1);
+
   const monthName = currentMonth.toLocaleString('default', {
     month: 'long',
     year: 'numeric',
@@ -147,7 +155,10 @@ export const SummaryScreen: React.FC = () => {
               <TouchableOpacity style={styles.headerButton} onPress={handleAskAI}>
                 <Ionicons name="sparkles" size={24} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.headerButton}>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => navigation.navigate('Profile')}
+              >
                 <Ionicons name="notifications-outline" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
@@ -205,9 +216,23 @@ export const SummaryScreen: React.FC = () => {
             ) : totalWorkouts === 0 ? (
               <Text style={styles.emptyText}>No workouts this month</Text>
             ) : (
-              <Text style={styles.emptyText}>
-                {Math.ceil(monthDays / 7)} weeks • ~{weeklyAverage} workouts/week
-              </Text>
+              weeklyBreakdown.map((count, index) => (
+                <View key={index} style={styles.dayRow}>
+                  <Text style={styles.weekLabel}>Week {index + 1}</Text>
+                  <View style={styles.dayBarContainer}>
+                    <View
+                      style={[
+                        styles.dayBar,
+                        {
+                          width: `${(count / maxWeekCount) * 100}%`,
+                          backgroundColor: count > 0 ? COLORS.primary : COLORS.cardBorder,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.dayCount}>{count}</Text>
+                </View>
+              ))
             )}
           </View>
 
@@ -441,6 +466,12 @@ const styles = StyleSheet.create({
     width: 40,
     fontSize: FONTS.bodySmall,
     fontWeight: FONTS.semibold,
+    color: COLORS.text,
+  },
+  weekLabel: {
+    width: 56,
+    fontSize: 14,
+    fontWeight: '600',
     color: COLORS.text,
   },
   dayBarContainer: {
