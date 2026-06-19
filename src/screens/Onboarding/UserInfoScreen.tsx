@@ -27,6 +27,7 @@ export const UserInfoScreen: React.FC<UserInfoScreenProps> = ({ onComplete }) =>
   const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
   const [unit, setUnit] = useState<'metric' | 'imperial'>('metric');
+  const [gender, setGender] = useState<'male' | 'female' | undefined>(undefined);
   const [weeklyGoal, setWeeklyGoalLocal] = useState(3);
   const [calorieGoal, setCalorieGoalLocal] = useState(2000);
   const [dietaryPreference, setDietaryPreference] = useState<string>('');
@@ -63,6 +64,7 @@ export const UserInfoScreen: React.FC<UserInfoScreenProps> = ({ onComplete }) =>
         height,
         unit,
         dietaryPreference,
+        gender,
       });
     }
     
@@ -118,6 +120,26 @@ export const UserInfoScreen: React.FC<UserInfoScreenProps> = ({ onComplete }) =>
               </Text>
               <Ionicons name="calendar-outline" size={20} color={COLORS.textSecondary} />
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Gender</Text>
+            <View style={styles.unitRow}>
+              <TouchableOpacity style={styles.unitButton} onPress={() => setGender('male')}>
+                <View style={[styles.unitButtonGradient, gender === 'male' && styles.unitButtonGradientActive]}>
+                  <Text style={[styles.unitButtonText, gender === 'male' && styles.unitButtonTextActive]}>
+                    Male
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.unitButton} onPress={() => setGender('female')}>
+                <View style={[styles.unitButtonGradient, gender === 'female' && styles.unitButtonGradientActive]}>
+                  <Text style={[styles.unitButtonText, gender === 'female' && styles.unitButtonTextActive]}>
+                    Female
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 

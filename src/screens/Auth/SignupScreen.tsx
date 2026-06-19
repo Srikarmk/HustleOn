@@ -9,37 +9,54 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS, SIZES } from '../../constants/theme';
+import { useAuth } from '../../context/AuthContext';
 
 interface SignupScreenProps {
-  onSignup: () => void;
   onNavigateToLogin: () => void;
-  onGoogleSignup: () => void;
 }
 
-export const SignupScreen: React.FC<SignupScreenProps> = ({
-  onSignup,
-  onNavigateToLogin,
-  onGoogleSignup,
-}) => {
+export const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigateToLogin }) => {
+  const { signUp } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const handleSignup = () => {
-    // Dummy signup - just call onSignup
-    if (name && email && password && password === confirmPassword) {
-      onSignup();
-    }
-  };
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isValid = name && email && password && password === confirmPassword && password.length >= 6;
+
+  const handleSignup = async () => {
+    if (!isValid || loading) return;
+    setError(null);
+    setLoading(true);
+    const { error: signUpError, needsConfirmation } = await signUp(email, password, name);
+    setLoading(false);
+    if (signUpError) {
+      setError(signUpError);
+      return;
+    }
+    if (needsConfirmation) {
+      Alert.alert(
+        'Confirm your email',
+        'We sent a confirmation link to your email. Confirm it, then sign in.',
+        [{ text: 'OK', onPress: onNavigateToLogin }]
+      );
+    }
+    // Otherwise a session was issued and the auth listener swaps navigators.
+  };
+
+  const handleGoogle = () => {
+    Alert.alert('Coming Soon', 'Google sign-up is coming in a future update.');
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -148,12 +165,18 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({
               )}
             </View>
 
+            {error && <Text style={styles.serverErrorText}>{error}</Text>}
+
             <TouchableOpacity
-              style={[styles.signupButton, !isValid && styles.signupButtonDisabled]}
+              style={[styles.signupButton, (!isValid || loading) && styles.signupButtonDisabled]}
               onPress={handleSignup}
-              disabled={!isValid}
+              disabled={!isValid || loading}
             >
-              <Text style={styles.signupButtonText}>Sign Up</Text>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.signupButtonText}>Sign Up</Text>
+              )}
             </TouchableOpacity>
 
             <View style={styles.divider}>
@@ -162,7 +185,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({
               <View style={styles.dividerLine} />
             </View>
 
-            <TouchableOpacity style={styles.googleButton} onPress={onGoogleSignup}>
+            <TouchableOpacity style={styles.googleButton} onPress={handleGoogle}>
               <Ionicons name="logo-google" size={20} color={COLORS.text} />
               <Text style={styles.googleButtonText}>Sign up with Google</Text>
             </TouchableOpacity>
@@ -257,6 +280,12 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     fontSize: 12,
     marginTop: 5,
+  },
+  serverErrorText: {
+    color: COLORS.error,
+    fontSize: 14,
+    marginBottom: 15,
+    textAlign: 'center',
   },
   signupButton: {
     backgroundColor: COLORS.highlight,

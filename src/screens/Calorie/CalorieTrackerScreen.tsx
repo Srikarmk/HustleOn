@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -14,12 +14,14 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useStore } from '../../store';
 import { COLORS, SIZES } from '../../constants/theme';
 import { generateGeminiResponse } from '../../config/gemini';
 
 export const CalorieTrackerScreen: React.FC = () => {
-  const { meals, calorieGoal, setCalorieGoal, loadData, addMeal, removeMeal } = useStore();
+  const { meals, calorieGoal, setCalorieGoal, addMeal, removeMeal } = useStore();
+  const navigation = useNavigation<any>();
   const [today] = useState(new Date().toISOString().split('T')[0]);
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiResponse, setAiResponse] = useState('');
@@ -29,10 +31,6 @@ export const CalorieTrackerScreen: React.FC = () => {
   const [foodAmount, setFoodAmount] = useState('');
   const [isAnalyzingFood, setIsAnalyzingFood] = useState(false);
   const [foodAnalysis, setFoodAnalysis] = useState<any>(null);
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   const handleAskAI = async () => {
     setShowAIModal(true);
@@ -79,7 +77,10 @@ export const CalorieTrackerScreen: React.FC = () => {
               <TouchableOpacity style={styles.headerButton} onPress={handleAskAI}>
                 <Ionicons name="sparkles" size={24} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.headerButton}>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => navigation.navigate('Profile')}
+              >
                 <Ionicons name="notifications-outline" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>

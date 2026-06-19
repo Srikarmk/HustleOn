@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,6 @@ import { AIChatScreen } from '../screens/AI/AIChatScreen';
 import { FloatingAIButton } from '../components/FloatingAIButton';
 import { MainTabParamList, RootStackParamList } from '../types';
 import { COLORS } from '../constants/theme';
-import { useStore } from '../store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -55,12 +54,7 @@ const ProfileWithButton = () => (
 );
 
 export const MainNavigator: React.FC = () => {
-  const { loadData } = useStore();
   const insets = useSafeAreaInsets();
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   return (
     <Tab.Navigator
@@ -133,12 +127,6 @@ export const MainNavigator: React.FC = () => {
 
 // Main Navigator with Stack for AI Chat Modal
 export const MainNavigatorWithStack: React.FC = () => {
-  const { loadData } = useStore();
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
   return (
     <Stack.Navigator>
       <Stack.Screen

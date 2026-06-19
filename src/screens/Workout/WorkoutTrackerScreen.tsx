@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useStore } from '../../store';
 import { COLORS, SIZES } from '../../constants/theme';
 
@@ -19,17 +23,21 @@ export const WorkoutTrackerScreen: React.FC = () => {
     currentStreak,
     setWeeklyGoal,
     addWorkout,
-    loadData,
+    supplements,
+    addSupplement,
+    removeSupplement,
+    toggleSupplementTaken,
   } = useStore();
+  const navigation = useNavigation<any>();
 
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
   );
   const [currentMonth, setCurrentMonth] = useState(new Date());
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  const today = new Date().toISOString().split('T')[0];
+  const [showSupplementModal, setShowSupplementModal] = useState(false);
+  const [suppName, setSuppName] = useState('');
+  const [suppDosage, setSuppDosage] = useState('');
 
   const workoutsThisWeek = workouts.filter((w) => {
     const workoutDate = new Date(w.date);
@@ -78,7 +86,10 @@ export const WorkoutTrackerScreen: React.FC = () => {
                   <Text style={styles.streakText}>{currentStreak}</Text>
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.headerButton}>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => navigation.navigate('Profile')}
+              >
                 <Ionicons name="notifications-outline" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
@@ -150,14 +161,56 @@ export const WorkoutTrackerScreen: React.FC = () => {
           {/* Supplement Tracker */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Supplement Tracker</Text>
+            {supplements.length > 0 && (
+              <View style={styles.supplementItems}>
+                {supplements.map((supp) => {
+                  const takenToday = supp.takenDates.includes(today);
+                  return (
+                    <View key={supp.id} style={styles.supplementItem}>
+                      <TouchableOpacity
+                        style={styles.supplementCheck}
+                        onPress={() => toggleSupplementTaken(supp.id, today)}
+                      >
+                        <Ionicons
+                          name={takenToday ? 'checkmark-circle' : 'ellipse-outline'}
+                          size={26}
+                          color={takenToday ? COLORS.success : COLORS.textSecondary}
+                        />
+                      </TouchableOpacity>
+                      <View style={styles.supplementInfo}>
+                        <Text style={styles.supplementName}>{supp.name}</Text>
+                        {supp.dosage ? (
+                          <Text style={styles.supplementDosage}>{supp.dosage}</Text>
+                        ) : null}
+                      </View>
+                      <TouchableOpacity
+                        onPress={() =>
+                          Alert.alert('Remove Supplement', `Remove "${supp.name}"?`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Remove', style: 'destructive', onPress: () => removeSupplement(supp.id) },
+                          ])
+                        }
+                      >
+                        <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
             <View style={styles.supplementList}>
-              <TouchableOpacity style={styles.addSupplementButton}>
+              <TouchableOpacity
+                style={styles.addSupplementButton}
+                onPress={() => setShowSupplementModal(true)}
+              >
                 <Ionicons name="add-circle-outline" size={24} color={COLORS.primary} />
                 <Text style={styles.addSupplementText}>Add Supplement</Text>
               </TouchableOpacity>
-              <Text style={styles.supplementHint}>
-                Track your daily vitamins and supplements
-              </Text>
+              {supplements.length === 0 && (
+                <Text style={styles.supplementHint}>
+                  Track your daily vitamins and supplements
+                </Text>
+              )}
             </View>
           </View>
 
@@ -202,6 +255,70 @@ export const WorkoutTrackerScreen: React.FC = () => {
           </View>
         </ScrollView>
       </View>
+
+      {/* Add Supplement Modal */}
+      <Modal
+        visible={showSupplementModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSupplementModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Supplement</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowSupplementModal(false);
+                  setSuppName('');
+                  setSuppDosage('');
+                }}
+              >
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>Name</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g., Creatine"
+              placeholderTextColor={COLORS.textSecondary}
+              value={suppName}
+              onChangeText={setSuppName}
+            />
+
+            <Text style={[styles.inputLabel, { marginTop: 15 }]}>Dosage (optional)</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g., 5g daily"
+              placeholderTextColor={COLORS.textSecondary}
+              value={suppDosage}
+              onChangeText={setSuppDosage}
+            />
+
+            <TouchableOpacity
+              style={styles.modalSaveButton}
+              onPress={() => {
+                if (!suppName.trim()) {
+                  Alert.alert('Error', 'Please enter a supplement name');
+                  return;
+                }
+                addSupplement({
+                  id: Date.now().toString(),
+                  name: suppName.trim(),
+                  dosage: suppDosage.trim() || undefined,
+                  takenDates: [],
+                });
+                setShowSupplementModal(false);
+                setSuppName('');
+                setSuppDosage('');
+              }}
+            >
+              <Text style={styles.modalSaveButtonText}>Add Supplement</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -420,6 +537,85 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 10,
     textAlign: 'center',
+  },
+  supplementItems: {
+    marginBottom: 15,
+  },
+  supplementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+  },
+  supplementCheck: {
+    padding: 2,
+  },
+  supplementInfo: {
+    flex: 1,
+  },
+  supplementName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  supplementDosage: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: COLORS.card,
+    borderRadius: SIZES.borderRadius,
+    padding: 25,
+    width: '90%',
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.text,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  modalInput: {
+    backgroundColor: COLORS.background,
+    borderRadius: SIZES.borderRadius,
+    padding: 15,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    fontSize: 16,
+  },
+  modalSaveButton: {
+    marginTop: 20,
+    backgroundColor: COLORS.button,
+    borderRadius: SIZES.borderRadius,
+    padding: 15,
+    alignItems: 'center',
+  },
+  modalSaveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

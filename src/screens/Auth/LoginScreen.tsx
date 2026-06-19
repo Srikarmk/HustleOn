@@ -9,31 +9,53 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS, SIZES } from '../../constants/theme';
+import { useAuth } from '../../context/AuthContext';
 
 interface LoginScreenProps {
-  onLogin: () => void;
   onNavigateToSignup: () => void;
-  onGoogleSignup: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({
-  onLogin,
-  onNavigateToSignup,
-  onGoogleSignup,
-}) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToSignup }) => {
+  const { signIn, resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = () => {
-    // Dummy login - just call onLogin
-    if (email && password) {
-      onLogin();
+  const handleLogin = async () => {
+    if (!email || !password || loading) return;
+    setError(null);
+    setLoading(true);
+    const { error: signInError } = await signIn(email, password);
+    setLoading(false);
+    if (signInError) {
+      // On success the auth listener swaps navigators automatically.
+      setError(signInError);
     }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Reset Password', 'Enter your email above first, then tap Forgot Password.');
+      return;
+    }
+    const { error: resetError } = await resetPassword(email);
+    if (resetError) {
+      Alert.alert('Reset Password', resetError);
+    } else {
+      Alert.alert('Reset Password', 'Check your email for a password reset link.');
+    }
+  };
+
+  const handleGoogle = () => {
+    Alert.alert('Coming Soon', 'Google sign-in is coming in a future update.');
   };
 
   return (
@@ -99,16 +121,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </View>
             </View>
 
-            <TouchableOpacity style={styles.forgotPassword}>
+            <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
 
+            {error && <Text style={styles.errorText}>{error}</Text>}
+
             <TouchableOpacity
-              style={[styles.loginButton, (!email || !password) && styles.loginButtonDisabled]}
+              style={[styles.loginButton, (!email || !password || loading) && styles.loginButtonDisabled]}
               onPress={handleLogin}
-              disabled={!email || !password}
+              disabled={!email || !password || loading}
             >
-              <Text style={styles.loginButtonText}>Sign In</Text>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.loginButtonText}>Sign In</Text>
+              )}
             </TouchableOpacity>
 
             <View style={styles.divider}>
@@ -117,7 +145,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <View style={styles.dividerLine} />
             </View>
 
-            <TouchableOpacity style={styles.googleButton} onPress={onGoogleSignup}>
+            <TouchableOpacity style={styles.googleButton} onPress={handleGoogle}>
               <Ionicons name="logo-google" size={20} color={COLORS.text} />
               <Text style={styles.googleButtonText}>Sign in with Google</Text>
             </TouchableOpacity>
@@ -216,6 +244,12 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: 14,
+    marginBottom: 15,
+    textAlign: 'center',
   },
   loginButton: {
     backgroundColor: COLORS.highlight,

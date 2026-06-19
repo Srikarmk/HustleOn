@@ -62,6 +62,7 @@ export interface UserProfile {
   unit: 'metric' | 'imperial';
   dietaryPreference?: string;
   profilePictureUri?: string;
+  gender?: 'male' | 'female';
 }
 
 export interface Goal {
@@ -109,6 +110,13 @@ export interface Friend {
   connectedAt: string;
 }
 
+export interface Supplement {
+  id: string;
+  name: string;
+  dosage?: string;
+  takenDates: string[]; // 'YYYY-MM-DD' dates the supplement was taken
+}
+
 export interface AppState {
   userProfile: UserProfile | null;
   workouts: Workout[];
@@ -122,9 +130,12 @@ export interface AppState {
   privacySettings: PrivacySettings;
   themeSettings: ThemeSettings;
   friends: Friend[];
+  supplements: Supplement[];
   weeklyGoal: number;
   calorieGoal: number;
   currentStreak: number;
+  // Whole-account last-write-wins sync clock (ISO timestamp).
+  dataUpdatedAt: string;
   setUserProfile: (profile: UserProfile) => void;
   addWorkout: (workout: Workout) => void;
   removeWorkout: (id: string) => void;
@@ -143,11 +154,35 @@ export interface AppState {
   updateThemeSettings: (settings: Partial<ThemeSettings>) => void;
   addFriend: (friend: Friend) => void;
   removeFriend: (id: string) => void;
+  addSupplement: (supplement: Supplement) => void;
+  removeSupplement: (id: string) => void;
+  toggleSupplementTaken: (id: string, date: string) => void;
   setWeeklyGoal: (goal: number) => void;
   setCalorieGoal: (goal: number) => void;
   updateStreak: () => void;
   loadData: () => Promise<void>;
   saveData: () => Promise<void>;
+  // Apply a remote snapshot during sync without bumping the local clock.
+  applyRemoteState: (data: RemoteSnapshot, remoteUpdatedAt: string) => Promise<void>;
+}
+
+// Subset of state synced to/from Supabase.
+export interface RemoteSnapshot {
+  userProfile: UserProfile | null;
+  workouts: Workout[];
+  meals: Meal[];
+  bmiRecords: BMIRecord[];
+  bodyMeasurements: BodyMeasurement[];
+  progressPhotos: ProgressPhoto[];
+  goals: Goal[];
+  integrations: Integration[];
+  notificationPreferences: NotificationPreference[];
+  privacySettings: PrivacySettings;
+  themeSettings: ThemeSettings;
+  friends: Friend[];
+  supplements: Supplement[];
+  weeklyGoal: number;
+  calorieGoal: number;
 }
 
 export type MainTabParamList = {

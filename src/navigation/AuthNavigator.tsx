@@ -10,17 +10,7 @@ export type AuthStackParamList = {
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
-interface AuthNavigatorProps {
-  onLogin: () => void;
-  onSignup: () => void;
-  onGoogleSignup: () => void;
-}
-
-export const AuthNavigator: React.FC<AuthNavigatorProps> = ({
-  onLogin,
-  onSignup,
-  onGoogleSignup,
-}) => {
+export const AuthNavigator: React.FC = () => {
   return (
     <Stack.Navigator
       initialRouteName="Login"
@@ -30,25 +20,14 @@ export const AuthNavigator: React.FC<AuthNavigatorProps> = ({
     >
       <Stack.Screen name="Login">
         {(props) => (
-          <LoginScreen
-            {...props}
-            onLogin={onLogin}
-            onNavigateToSignup={() => props.navigation.navigate('Signup')}
-            onGoogleSignup={onGoogleSignup}
-          />
+          <LoginScreen onNavigateToSignup={() => props.navigation.navigate('Signup')} />
         )}
       </Stack.Screen>
       <Stack.Screen name="Signup">
         {(props) => (
-          <SignupScreen
-            {...props}
-            onSignup={onSignup}
-            onNavigateToLogin={() => props.navigation.navigate('Login')}
-            onGoogleSignup={onGoogleSignup}
-          />
+          <SignupScreen onNavigateToLogin={() => props.navigation.navigate('Login')} />
         )}
       </Stack.Screen>
     </Stack.Navigator>
   );
 };
-
