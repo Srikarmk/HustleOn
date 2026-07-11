@@ -19,6 +19,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../../store';
 import { COLORS, SIZES } from '../../constants/theme';
 import { generateGeminiResponse, AI_DISCLAIMER } from '../../config/gemini';
+import { FadeInView } from '../../components/FadeInView';
+import { PressableScale } from '../../components/PressableScale';
+import { haptics } from '../../utils/haptics';
 import { BodyMeasurement, ProgressPhoto } from '../../types';
 
 export const BMICalculatorScreen: React.FC = () => {
@@ -120,6 +123,7 @@ export const BMICalculatorScreen: React.FC = () => {
       muscleMass,
       waistCircumference,
     });
+    haptics.success();
   };
 
   const handleAskAI = async () => {
@@ -393,19 +397,19 @@ export const BMICalculatorScreen: React.FC = () => {
                   keyboardType="numeric"
                 />
 
-                <TouchableOpacity style={styles.calculateButton} onPress={calculateBMI}>
+                <PressableScale style={styles.calculateButton} onPress={calculateBMI}>
                   <Text style={styles.calculateButtonText}>Calculate BMI</Text>
-                </TouchableOpacity>
+                </PressableScale>
 
                 {bmi !== null && (
                   <>
-                    <View style={styles.resultContainer}>
+                    <FadeInView key={bmi} style={styles.resultContainer}>
                       <Text style={styles.resultLabel}>Your BMI</Text>
                       <Text style={styles.resultValue}>{bmi.toFixed(1)}</Text>
                       <Text style={[styles.resultCategory, { color: getCategoryColor(category) }]}>
                         {category}
                       </Text>
-                    </View>
+                    </FadeInView>
                     <TouchableOpacity style={styles.aiAdviceButton} onPress={handleAskAI}>
                       <View style={styles.aiAdviceButtonContent}>
                         <Ionicons name="sparkles" size={20} color="#fff" />

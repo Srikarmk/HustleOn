@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,17 @@ import {
   Modal,
   TextInput,
   Alert,
+  Animated,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useStore } from '../../store';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
+import { FadeInView } from '../../components/FadeInView';
+import { PressableScale } from '../../components/PressableScale';
+import { AnimatedProgressBar } from '../../components/AnimatedProgressBar';
+import { haptics } from '../../utils/haptics';
 
 export const WorkoutTrackerScreen: React.FC = () => {
   const {
@@ -29,6 +34,16 @@ export const WorkoutTrackerScreen: React.FC = () => {
     toggleSupplementTaken,
   } = useStore();
   const navigation = useNavigation<any>();
+
+  // Streak number pops when it changes.
+  const streakScale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (currentStreak <= 0) return;
+    Animated.sequence([
+      Animated.spring(streakScale, { toValue: 1.35, useNativeDriver: true, speed: 20, bounciness: 12 }),
+      Animated.spring(streakScale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 12 }),
+    ]).start();
+  }, [currentStreak, streakScale]);
 
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
@@ -97,7 +112,7 @@ export const WorkoutTrackerScreen: React.FC = () => {
 
           {/* I Worked Out Today Button */}
           <View style={styles.workoutButtonContainer}>
-            <TouchableOpacity
+            <PressableScale
               style={styles.workoutTodayButton}
               onPress={() => {
                 const today = new Date().toISOString().split('T')[0];
@@ -108,6 +123,7 @@ export const WorkoutTrackerScreen: React.FC = () => {
                     date: today,
                     exercises: [],
                   });
+                  haptics.success();
                 }
               }}
             >
@@ -115,11 +131,11 @@ export const WorkoutTrackerScreen: React.FC = () => {
                 <Ionicons name="checkmark-circle" size={24} color="#fff" />
                 <Text style={styles.workoutTodayButtonText}>I worked out today</Text>
               </View>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
 
           {/* Weekly Goal Card */}
-          <View style={styles.card}>
+          <FadeInView style={styles.card}>
             <View style={styles.goalCardHighlight}>
               <View style={styles.goalHeader}>
                 <View style={styles.goalTitleContainer}>
@@ -133,21 +149,26 @@ export const WorkoutTrackerScreen: React.FC = () => {
               <Text style={styles.goalValue}>
                 {workoutsThisWeek} / {weeklyGoal} days
               </Text>
-              <View style={styles.progressBarContainer}>
-                <View style={[styles.progressBar, { width: `${Math.min(progress * 100, 100)}%` }]} />
-              </View>
+              <AnimatedProgressBar
+                progress={progress}
+                color={COLORS.accent}
+                trackStyle={styles.progressBarContainer}
+                fillStyle={styles.progressBar}
+              />
               <Text style={styles.goalSubtext}>
                 {Math.max(0, weeklyGoal - workoutsThisWeek)} more to reach your goal
               </Text>
             </View>
-          </View>
+          </FadeInView>
 
           {/* Stats Cards */}
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Ionicons name="flame" size={24} color={COLORS.accent} />
               <Text style={styles.statLabel}>Streak</Text>
-              <Text style={styles.statValue}>{currentStreak}</Text>
+              <Animated.Text style={[styles.statValue, { transform: [{ scale: streakScale }] }]}>
+                {currentStreak}
+              </Animated.Text>
               <Text style={styles.statSubtext}>days</Text>
             </View>
             <View style={styles.statCard}>
@@ -169,7 +190,10 @@ export const WorkoutTrackerScreen: React.FC = () => {
                     <View key={supp.id} style={styles.supplementItem}>
                       <TouchableOpacity
                         style={styles.supplementCheck}
-                        onPress={() => toggleSupplementTaken(supp.id, today)}
+                        onPress={() => {
+                          haptics.selection();
+                          toggleSupplementTaken(supp.id, today);
+                        }}
                       >
                         <Ionicons
                           name={takenToday ? 'checkmark-circle' : 'ellipse-outline'}

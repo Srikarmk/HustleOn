@@ -18,6 +18,9 @@ import { useNavigation } from '@react-navigation/native';
 import { useStore } from '../../store';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
 import { generateGeminiResponse, AI_DISCLAIMER } from '../../config/gemini';
+import { PressableScale } from '../../components/PressableScale';
+import { AnimatedProgressBar } from '../../components/AnimatedProgressBar';
+import { haptics } from '../../utils/haptics';
 
 export const CalorieTrackerScreen: React.FC = () => {
   const { meals, calorieGoal, setCalorieGoal, addMeal, removeMeal } = useStore();
@@ -101,14 +104,12 @@ export const CalorieTrackerScreen: React.FC = () => {
               <Text style={styles.goalValue}>
                 {totalCalories} / {calorieGoal} cal
               </Text>
-              <View style={styles.progressBarContainer}>
-                <View
-                  style={[
-                    styles.progressBar,
-                    { width: `${Math.min(progress * 100, 100)}%` },
-                  ]}
-                />
-              </View>
+              <AnimatedProgressBar
+                progress={progress}
+                color={COLORS.accent}
+                trackStyle={styles.progressBarContainer}
+                fillStyle={styles.progressBar}
+              />
               <Text style={styles.goalSubtext}>
                 {remaining} calories remaining
               </Text>
@@ -132,7 +133,7 @@ export const CalorieTrackerScreen: React.FC = () => {
           </View>
 
           {/* Add Meal Button */}
-          <TouchableOpacity 
+          <PressableScale
             style={styles.addButton}
             onPress={() => setShowAddMealModal(true)}
           >
@@ -140,7 +141,7 @@ export const CalorieTrackerScreen: React.FC = () => {
               <Ionicons name="add" size={24} color="#fff" />
               <Text style={styles.addButtonText}>Add Meal or Snack</Text>
             </View>
-          </TouchableOpacity>
+          </PressableScale>
 
           {/* Today's Meals */}
           <View style={styles.card}>
@@ -346,6 +347,7 @@ export const CalorieTrackerScreen: React.FC = () => {
                       carbs: foodAnalysis.carbs,
                       fats: foodAnalysis.fats,
                     });
+                    haptics.success();
                     setShowAddMealModal(false);
                     setFoodName('');
                     setFoodAmount('');
