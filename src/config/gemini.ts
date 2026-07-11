@@ -1,6 +1,7 @@
 // Gemini access — routed through the Supabase Edge Function `gemini-proxy`.
 // The API key lives only as a server-side secret, never in the app bundle.
 import { supabase } from '../lib/supabase';
+import { captureError } from '../lib/monitoring';
 
 export interface ChatTurn {
   role: 'user' | 'model';
@@ -44,7 +45,7 @@ export const generateGeminiResponse = async (
 
     return data.text as string;
   } catch (error: any) {
-    console.error('Error calling gemini-proxy:', error);
+    captureError(error, { scope: 'gemini' });
     return `I apologize, but I encountered an error: ${error?.message || 'Unknown error'}. Please try again.`;
   }
 };

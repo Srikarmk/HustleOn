@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { useStore } from '../store';
+import { captureError } from './monitoring';
 import type { RemoteSnapshot } from '../types';
 
 /**
@@ -263,7 +264,7 @@ export async function syncNow(): Promise<void> {
     useStore.getState().setSyncState('synced', new Date().toISOString());
   } catch (error) {
     // Offline or transient failure — try again on the next trigger.
-    console.error('Sync failed:', error);
+    captureError(error, { scope: 'sync' });
     useStore.getState().setSyncState('error');
   } finally {
     syncing = false;

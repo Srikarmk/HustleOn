@@ -61,6 +61,8 @@ See [`supabase/README.md`](supabase/README.md) for exact commands, and [`docs/pr
 - [x] AI **rate-limit** (60/user/day) + prompt cap + **medical disclaimer**
 - [x] Legal links wired (Privacy / Terms / Support) — *update placeholder URLs*
 - [x] **Sync-status UX** + local-cache clear on logout/delete
+- [x] **Crash-reporting seam** (`src/lib/monitoring.ts`) — activate with `@sentry/react-native` + `SENTRY_DSN`
+- [x] **Starter test suite** (`npm test`) — 8 store tests, all green
 - [x] **Multi-turn AI memory** — AI coach sends conversation history (capped 20 turns) via `systemInstruction` + multi-turn `contents`
 - [x] **Phase 4 build config (code)** — `eas.json`, iOS `bundleIdentifier` (placeholder) + `buildNumber`, `ios.privacyManifests`, App Store checklist doc
 

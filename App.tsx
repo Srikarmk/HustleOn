@@ -18,7 +18,11 @@ import {
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { useStore } from './src/store';
 import { syncNow, scheduleSync } from './src/lib/sync';
+import { initMonitoring } from './src/lib/monitoring';
 import { COLORS } from './src/constants/theme';
+
+// Initialize crash reporting as early as possible (no-op until a DSN is set).
+initMonitoring();
 
 // Show notifications while app is in the foreground
 Notifications.setNotificationHandler({

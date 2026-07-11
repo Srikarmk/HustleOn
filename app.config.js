@@ -64,6 +64,8 @@ module.exports = {
       supabaseAnonKey:
         process.env.SUPABASE_ANON_KEY ||
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cGl3cG96amhyemVweGJ0Z2FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NzU2NzgsImV4cCI6MjA5NjQ1MTY3OH0.cBBuqD6YwwWl8Zwta7lbf4Z6e6RM7Yo9zaun9H2Fg_E',
+      // Crash reporting DSN (optional). Empty = disabled. See src/lib/monitoring.ts.
+      sentryDsn: process.env.SENTRY_DSN || '',
     },
     plugins: [
       ['expo-notifications', {}],

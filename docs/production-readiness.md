@@ -30,13 +30,13 @@ Legend for "Owner": **Code** = I can do it in the repo · **You** = needs your a
 | Dedicated prod Supabase project | ⏳ | You | Today: one project, keys hardcoded as defaults in `app.config.js` (fine for dev). For prod: separate project, keys via EAS env. |
 | Supabase Pro tier | ⏳ | You | Free tier pauses on inactivity and has no backups. |
 | Auth emails (SMTP) + re-enable email confirmation | ⏳ | You | Configure SMTP + templates + redirect URLs; turn email confirmation back on (off for dev). |
-| Crash reporting (e.g. Sentry) | ☐ | Code | Not yet added. The Profile "Analytics" toggle currently controls nothing. |
+| Crash reporting (e.g. Sentry) | ◑ | Both | Seam wired app-wide (`src/lib/monitoring.ts`, `captureError`) and gated on the Analytics toggle. Inert until you `npm i @sentry/react-native`, add the Expo plugin, and set `SENTRY_DSN` — then build a dev client. |
 
 ## 🟡 Tier 3 — Quality / polish
 
 | Item | Status | Owner | Notes |
 |------|--------|-------|-------|
-| Automated tests | ☐ | Code | None yet. Add smoke tests for auth, store, sync push/pull. |
+| Automated tests | ◑ | Code | Starter suite added (`jest-expo`, `npm test`): 8 store tests (streak grace-day, supplement toggle, clearLocalData, clock bump). Extend to auth + sync next. |
 | Offline detection (NetInfo) | ☐ | Code | Sync status is inferred from attempts; add real connectivity detection. |
 | Per-row / CRDT sync | ☐ | Code | Current model is whole-account last-write-wins (see caveat below). |
 | App Store assets | ⏳ | You | 1024² icon (no alpha), screenshots (6.7"/6.5"; iPad too since `supportsTablet: true` — or set false), description, keywords, age rating, category. |

@@ -68,6 +68,7 @@ Follow [`supabase/README.md`](supabase/README.md) to:
 ```bash
 npm run ios       # iOS Simulator (recommended)
 npm start         # Expo dev server (choose a target)
+npm test          # Run the Jest test suite
 ```
 
 On first launch you'll go through onboarding → sign up / log in → the main tabs. AI features and cross-device sync require step 3 to be complete.
