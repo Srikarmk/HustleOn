@@ -94,7 +94,7 @@ export const CalorieTrackerScreen: React.FC = () => {
                   <Ionicons name="eye" size={20} color="#fff" />
                   <Text style={styles.goalTitle}>Daily Goal</Text>
                 </View>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
                   <Text style={styles.changeButton}>Change</Text>
                 </TouchableOpacity>
               </View>

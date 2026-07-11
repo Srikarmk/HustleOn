@@ -116,6 +116,7 @@ export const ProfileScreen: React.FC = () => {
   
   // Friends State
   const [showFriendsModal, setShowFriendsModal] = useState(false);
+  const [newFriendName, setNewFriendName] = useState('');
 
   useEffect(() => {
     loadProfile();
@@ -1072,6 +1073,171 @@ export const ProfileScreen: React.FC = () => {
                 >
                   <View style={styles.modalButtonGradient}>
                     <Text style={styles.modalButtonTextSave}>Save</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Add / Edit Goal Modal */}
+        <Modal
+          visible={showGoalModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowGoalModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>{editingGoal ? 'Edit Goal' : 'New Goal'}</Text>
+
+              <Text style={styles.inputLabel}>Type</Text>
+              {(['weight', 'body_composition', 'performance', 'other'] as const).map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  style={[styles.layoutOption, goalForm.type === t && styles.layoutOptionActive]}
+                  onPress={() => setGoalForm({ ...goalForm, type: t })}
+                >
+                  <Text
+                    style={[
+                      styles.layoutOptionText,
+                      goalForm.type === t && styles.layoutOptionTextActive,
+                    ]}
+                  >
+                    {t === 'body_composition' ? 'Body Composition' : t.charAt(0).toUpperCase() + t.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              <Text style={[styles.inputLabel, { marginTop: 12 }]}>Title</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g., Reach 75 kg"
+                placeholderTextColor={COLORS.textSecondary}
+                value={goalForm.title}
+                onChangeText={(v) => setGoalForm({ ...goalForm, title: v })}
+              />
+
+              <Text style={styles.inputLabel}>Target Value</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g., 75"
+                placeholderTextColor={COLORS.textSecondary}
+                value={goalForm.targetValue}
+                onChangeText={(v) => setGoalForm({ ...goalForm, targetValue: v })}
+                keyboardType="numeric"
+              />
+
+              <Text style={styles.inputLabel}>Target Date (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="2026-12-31"
+                placeholderTextColor={COLORS.textSecondary}
+                value={goalForm.targetDate}
+                onChangeText={(v) => setGoalForm({ ...goalForm, targetDate: v })}
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonCancel]}
+                  onPress={() => setShowGoalModal(false)}
+                >
+                  <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalButton, styles.modalButtonSave]} onPress={saveGoal}>
+                  <View style={styles.modalButtonGradient}>
+                    <Text style={styles.modalButtonTextSave}>Save</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Layout Style Modal */}
+        <Modal
+          visible={showThemeModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowThemeModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Layout Style</Text>
+              {(['compact', 'comfortable', 'spacious'] as const).map((layout) => (
+                <TouchableOpacity
+                  key={layout}
+                  style={[styles.layoutOption, themeSettings.layout === layout && styles.layoutOptionActive]}
+                  onPress={() => {
+                    updateThemeSettings({ layout });
+                    setShowThemeModal(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.layoutOptionText,
+                      themeSettings.layout === layout && styles.layoutOptionTextActive,
+                    ]}
+                  >
+                    {layout.charAt(0).toUpperCase() + layout.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel, { marginTop: 10 }]}
+                onPress={() => setShowThemeModal(false)}
+              >
+                <Text style={styles.modalButtonTextCancel}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Add Friend Modal */}
+        <Modal
+          visible={showFriendsModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowFriendsModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Add Friend</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Friend's name"
+                placeholderTextColor={COLORS.textSecondary}
+                value={newFriendName}
+                onChangeText={setNewFriendName}
+              />
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonCancel]}
+                  onPress={() => {
+                    setNewFriendName('');
+                    setShowFriendsModal(false);
+                  }}
+                >
+                  <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonSave]}
+                  onPress={() => {
+                    if (!newFriendName.trim()) {
+                      Alert.alert('Error', 'Please enter a name');
+                      return;
+                    }
+                    addFriend({
+                      id: Date.now().toString(),
+                      name: newFriendName.trim(),
+                      connectedAt: new Date().toISOString(),
+                    });
+                    setNewFriendName('');
+                    setShowFriendsModal(false);
+                  }}
+                >
+                  <View style={styles.modalButtonGradient}>
+                    <Text style={styles.modalButtonTextSave}>Add</Text>
                   </View>
                 </TouchableOpacity>
               </View>
