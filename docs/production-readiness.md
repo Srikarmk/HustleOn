@@ -36,11 +36,11 @@ Legend for "Owner": **Code** = I can do it in the repo · **You** = needs your a
 
 | Item | Status | Owner | Notes |
 |------|--------|-------|-------|
-| Automated tests | ◑ | Code | Starter suite added (`jest-expo`, `npm test`): 8 store tests (streak grace-day, supplement toggle, clearLocalData, clock bump). Extend to auth + sync next. |
-| Offline detection (NetInfo) | ☐ | Code | Sync status is inferred from attempts; add real connectivity detection. |
+| Automated tests | ◑ | Code | `jest-expo` (`npm test`): **17 tests** — store (streak, supplements, goals, meals, clearLocalData, applyRemoteState clock), sync LWW decision, monitoring fallback. Extend to auth + full sync IO next. |
+| Offline detection (NetInfo) | ✅ | Code | `@react-native-community/netinfo`: sync skips + marks "offline" when disconnected; App retries on reconnect; Profile shows the offline state. |
 | Per-row / CRDT sync | ☐ | Code | Current model is whole-account last-write-wins (see caveat below). |
 | App Store assets | ⏳ | You | 1024² icon (no alpha), screenshots (6.7"/6.5"; iPad too since `supportsTablet: true` — or set false), description, keywords, age rating, category. |
-| Splash matches dark theme | ☐ | Code | `userInterfaceStyle: 'light'` + white splash under a dark app; minor flash. |
+| Splash matches dark theme | ✅ | Code | `userInterfaceStyle: 'dark'` + `#1e1e2e` splash background. |
 | Confirm bundle identifier | ⏳ | You | Placeholder `com.hustleon.app` in `app.config.js` + `eas.json`. Permanent once registered. |
 
 ---

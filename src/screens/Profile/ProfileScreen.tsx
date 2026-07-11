@@ -806,7 +806,7 @@ export const ProfileScreen: React.FC = () => {
             <View style={styles.syncStatusRow}>
               <Ionicons
                 name={
-                  syncStatus === 'error'
+                  syncStatus === 'error' || syncStatus === 'offline'
                     ? 'cloud-offline-outline'
                     : syncStatus === 'syncing'
                     ? 'sync-outline'
@@ -818,6 +818,8 @@ export const ProfileScreen: React.FC = () => {
               <Text style={styles.syncStatusText}>
                 {syncStatus === 'syncing'
                   ? 'Syncing…'
+                  : syncStatus === 'offline'
+                  ? 'Offline — will sync when reconnected'
                   : syncStatus === 'error'
                   ? 'Sync failed — will retry'
                   : lastSyncedAt

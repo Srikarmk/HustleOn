@@ -139,7 +139,7 @@ export interface AppState {
   // Whole-account last-write-wins sync clock (ISO timestamp).
   dataUpdatedAt: string;
   // Transient sync UI state (not persisted, not synced).
-  syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
+  syncStatus: 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
   lastSyncedAt: string | null;
   setSyncState: (status: AppState['syncStatus'], lastSyncedAt?: string | null) => void;
   setUserProfile: (profile: UserProfile) => void;

@@ -1,3 +1,4 @@
+import NetInfo from '@react-native-community/netinfo';
 import { supabase } from './supabase';
 import { useStore } from '../store';
 import { captureError } from './monitoring';
@@ -236,6 +237,21 @@ async function push(userId: string, localTs: string): Promise<void> {
  * Run one sync pass. Safe to call on launch and on app foreground.
  * No-ops when signed out, offline, or already syncing.
  */
+/**
+ * Pure last-write-wins decision. Uses epoch millis so it tolerates the format
+ * difference between JS ISO ('…Z') and Postgres timestamptz ('…+00:00').
+ */
+export function decideSyncDirection(
+  localTs: string,
+  remoteTs: string | null
+): 'pull' | 'push' | 'noop' {
+  const localMs = new Date(localTs).getTime();
+  const remoteMs = remoteTs ? new Date(remoteTs).getTime() : 0;
+  if (remoteTs && remoteMs > localMs) return 'pull';
+  if (!remoteTs || localMs > remoteMs) return 'push';
+  return 'noop';
+}
+
 export async function syncNow(): Promise<void> {
   if (syncing) return;
   const {
@@ -244,23 +260,28 @@ export async function syncNow(): Promise<void> {
   const userId = session?.user?.id;
   if (!userId) return;
 
+  // Skip when offline; the App reconnect listener retries on the next connection.
+  const net = await NetInfo.fetch();
+  if (net.isConnected === false) {
+    useStore.getState().setSyncState('offline');
+    return;
+  }
+
   syncing = true;
-  const store = useStore.getState();
-  store.setSyncState('syncing');
+  useStore.getState().setSyncState('syncing');
   try {
     const remoteTs = await fetchRemoteClock(userId);
     const localTs = useStore.getState().dataUpdatedAt;
-    const remoteMs = remoteTs ? new Date(remoteTs).getTime() : 0;
-    const localMs = new Date(localTs).getTime();
 
-    if (remoteTs && remoteMs > localMs) {
+    const direction = decideSyncDirection(localTs, remoteTs);
+    if (direction === 'pull' && remoteTs) {
       await pull(userId, remoteTs);
-    } else if (!remoteTs || localMs > remoteMs) {
+    } else if (direction === 'push') {
       await uploadPendingPhotos(userId);
       const ts = useStore.getState().dataUpdatedAt;
       await push(userId, ts);
     }
-    // equal -> nothing to do
+    // noop -> nothing to do
     useStore.getState().setSyncState('synced', new Date().toISOString());
   } catch (error) {
     // Offline or transient failure — try again on the next trigger.

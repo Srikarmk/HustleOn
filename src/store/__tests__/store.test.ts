@@ -1,5 +1,5 @@
 import { useStore } from '../index';
-import type { Workout } from '../../types';
+import type { Workout, Meal, Goal, RemoteSnapshot } from '../../types';
 
 const iso = (d: Date) => d.toISOString().split('T')[0];
 const daysAgo = (n: number) => iso(new Date(Date.now() - n * 86400000));
@@ -90,5 +90,71 @@ describe('clearLocalData', () => {
     expect(state.dataUpdatedAt).toBe('1970-01-01T00:00:00.000Z');
     // clearLocalData reseeds the default supplement list.
     expect(state.supplements.length).toBeGreaterThan(0);
+  });
+});
+
+describe('meals', () => {
+  it('adds and removes a meal', () => {
+    useStore.setState({ meals: [] });
+    const meal: Meal = { id: 'm1', date: daysAgo(0), time: '12:00', name: 'Eggs', calories: 200 };
+    useStore.getState().addMeal(meal);
+    expect(useStore.getState().meals).toHaveLength(1);
+    useStore.getState().removeMeal('m1');
+    expect(useStore.getState().meals).toHaveLength(0);
+  });
+});
+
+describe('goals', () => {
+  it('adds, updates, and removes a goal', () => {
+    useStore.setState({ goals: [] });
+    const goal: Goal = {
+      id: 'g1',
+      type: 'weight',
+      title: 'Cut',
+      targetValue: 75,
+      unit: 'kg',
+      targetDate: daysAgo(-30),
+      createdAt: new Date().toISOString(),
+    };
+    useStore.getState().addGoal(goal);
+    expect(useStore.getState().goals).toHaveLength(1);
+
+    useStore.getState().updateGoal('g1', { targetValue: 72 });
+    expect(useStore.getState().goals[0].targetValue).toBe(72);
+
+    useStore.getState().removeGoal('g1');
+    expect(useStore.getState().goals).toHaveLength(0);
+  });
+});
+
+describe('applyRemoteState', () => {
+  it('replaces state and sets the clock to the remote value (no bump)', async () => {
+    const remoteTs = '2030-01-01T00:00:00.000Z';
+    const snapshot = {
+      userProfile: null,
+      workouts: [workout(daysAgo(0))],
+      meals: [],
+      bmiRecords: [],
+      bodyMeasurements: [],
+      progressPhotos: [],
+      goals: [],
+      integrations: [],
+      notificationPreferences: [],
+      privacySettings: useStore.getState().privacySettings,
+      themeSettings: useStore.getState().themeSettings,
+      friends: [],
+      supplements: [],
+      weeklyGoal: 5,
+      calorieGoal: 2500,
+    } as unknown as RemoteSnapshot;
+
+    await useStore.getState().applyRemoteState(snapshot, remoteTs);
+    const state = useStore.getState();
+
+    expect(state.workouts).toHaveLength(1);
+    expect(state.weeklyGoal).toBe(5);
+    expect(state.calorieGoal).toBe(2500);
+    // The clock reflects the remote timestamp exactly — a pull must not bump it.
+    expect(state.dataUpdatedAt).toBe(remoteTs);
   });
 });

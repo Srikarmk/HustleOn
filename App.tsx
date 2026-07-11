@@ -5,6 +5,7 @@ import { View, ActivityIndicator, StyleSheet, AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
+import NetInfo from '@react-native-community/netinfo';
 import { OnboardingNavigator } from './src/navigation/OnboardingNavigator';
 import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { MainNavigatorWithStack } from './src/navigation/MainNavigator';
@@ -73,6 +74,17 @@ const AppContent: React.FC = () => {
       }
     });
     return () => sub.remove();
+  }, [isAuthenticated]);
+
+  // Sync when connectivity is regained.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const unsub = NetInfo.addEventListener((state) => {
+      if (state.isConnected) {
+        syncNow().catch(console.error);
+      }
+    });
+    return unsub;
   }, [isAuthenticated]);
 
   // Debounced push whenever a local mutation advances the sync clock.
