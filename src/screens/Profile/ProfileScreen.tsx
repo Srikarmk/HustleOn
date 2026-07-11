@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   Share,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -23,6 +24,11 @@ import { COLORS, FONTS, SIZES } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { scheduleAllNotifications } from '../../utils/notifications';
 import { Goal, Integration, NotificationPreference } from '../../types';
+
+// TODO: replace with the real hosted pages before App Store submission.
+const PRIVACY_URL = 'https://hustleon.app/privacy';
+const TERMS_URL = 'https://hustleon.app/terms';
+const SUPPORT_EMAIL = 'support@hustleon.app';
 
 interface UserProfile {
   name: string;
@@ -40,7 +46,7 @@ interface UserProfile {
 }
 
 export const ProfileScreen: React.FC = () => {
-  const { signOut } = useAuth();
+  const { signOut, deleteAccount } = useAuth();
   const store = useStore();
   const {
     weeklyGoal,
@@ -55,6 +61,8 @@ export const ProfileScreen: React.FC = () => {
     themeSettings,
     friends,
     currentStreak,
+    syncStatus,
+    lastSyncedAt,
     addGoal,
     updateGoal,
     removeGoal,
@@ -188,6 +196,40 @@ export const ProfileScreen: React.FC = () => {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Logout', style: 'destructive', onPress: () => { signOut(); } },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This permanently deletes your account and all your data (workouts, meals, photos, goals). This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            // Second confirmation for an irreversible, destructive action.
+            Alert.alert(
+              'Are you absolutely sure?',
+              'Your account and all data will be permanently erased.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete Forever',
+                  style: 'destructive',
+                  onPress: async () => {
+                    const { error } = await deleteAccount();
+                    if (error) {
+                      Alert.alert('Error', `Could not delete account: ${error}`);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
       ]
     );
   };
@@ -761,6 +803,28 @@ export const ProfileScreen: React.FC = () => {
                 thumbColor="#fff"
               />
             </View>
+            <View style={styles.syncStatusRow}>
+              <Ionicons
+                name={
+                  syncStatus === 'error'
+                    ? 'cloud-offline-outline'
+                    : syncStatus === 'syncing'
+                    ? 'sync-outline'
+                    : 'cloud-done-outline'
+                }
+                size={16}
+                color={syncStatus === 'error' ? COLORS.error : COLORS.textSecondary}
+              />
+              <Text style={styles.syncStatusText}>
+                {syncStatus === 'syncing'
+                  ? 'Syncing…'
+                  : syncStatus === 'error'
+                  ? 'Sync failed — will retry'
+                  : lastSyncedAt
+                  ? `Last synced ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                  : 'Not synced yet'}
+              </Text>
+            </View>
             <View style={styles.settingItem}>
               <View style={styles.settingInfo}>
                 <Ionicons name="analytics" size={20} color={COLORS.primary} />
@@ -849,19 +913,43 @@ export const ProfileScreen: React.FC = () => {
 
           {/* Other Options */}
           <View style={styles.card}>
-            <TouchableOpacity style={styles.optionItem}>
+            <TouchableOpacity
+              style={styles.optionItem}
+              onPress={() =>
+                Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=HustleOn%20Support`).catch(() =>
+                  Alert.alert('Support', `Email us at ${SUPPORT_EMAIL}`)
+                )
+              }
+            >
               <Ionicons name="help-circle" size={20} color={COLORS.text} />
               <Text style={styles.optionText}>Help & Support</Text>
               <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.optionItem}>
+            <TouchableOpacity
+              style={styles.optionItem}
+              onPress={() => Linking.openURL(PRIVACY_URL).catch(() => Alert.alert('Error', 'Could not open link'))}
+            >
               <Ionicons name="document-text" size={20} color={COLORS.text} />
-              <Text style={styles.optionText}>Terms & Privacy</Text>
+              <Text style={styles.optionText}>Privacy Policy</Text>
               <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.optionItem}>
+            <TouchableOpacity
+              style={styles.optionItem}
+              onPress={() => Linking.openURL(TERMS_URL).catch(() => Alert.alert('Error', 'Could not open link'))}
+            >
+              <Ionicons name="document-text-outline" size={20} color={COLORS.text} />
+              <Text style={styles.optionText}>Terms of Service</Text>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.optionItem}
+              onPress={() =>
+                Alert.alert('About HustleOn', 'HustleOn v1.0.0\nYour personal fitness companion.')
+              }
+            >
               <Ionicons name="information-circle" size={20} color={COLORS.text} />
               <Text style={styles.optionText}>About</Text>
               <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
@@ -874,6 +962,17 @@ export const ProfileScreen: React.FC = () => {
               <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
               <Text style={styles.logoutButtonText}>Logout</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Danger Zone — Delete Account */}
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccount}>
+              <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+              <Text style={styles.deleteAccountText}>Delete Account</Text>
+            </TouchableOpacity>
+            <Text style={styles.deleteAccountHint}>
+              Permanently deletes your account and all data. This cannot be undone.
+            </Text>
           </View>
 
           {/* Save Button */}
@@ -1215,6 +1314,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.error,
+  },
+  deleteAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 10,
+  },
+  deleteAccountText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.error,
+  },
+  deleteAccountHint: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 8,
   },
   modalInput: {
     backgroundColor: COLORS.background,
@@ -1568,6 +1685,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textSecondary,
     marginTop: 2,
+  },
+  syncStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+  },
+  syncStatusText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
   },
   exportButton: {
     flexDirection: 'row',

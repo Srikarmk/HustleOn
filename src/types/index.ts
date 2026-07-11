@@ -49,7 +49,8 @@ export interface BodyMeasurement {
 export interface ProgressPhoto {
   id: string;
   date: string;
-  uri: string;
+  uri: string; // displayable URL (local file:// before upload, signed URL after)
+  storagePath?: string; // object path in the private progress-photos bucket
   thumbnail?: string;
 }
 
@@ -61,7 +62,8 @@ export interface UserProfile {
   height: string;
   unit: 'metric' | 'imperial';
   dietaryPreference?: string;
-  profilePictureUri?: string;
+  profilePictureUri?: string; // displayable URL (local file:// before upload, signed URL after)
+  profilePicturePath?: string; // object path in the private progress-photos bucket
   gender?: 'male' | 'female';
 }
 
@@ -136,6 +138,10 @@ export interface AppState {
   currentStreak: number;
   // Whole-account last-write-wins sync clock (ISO timestamp).
   dataUpdatedAt: string;
+  // Transient sync UI state (not persisted, not synced).
+  syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
+  lastSyncedAt: string | null;
+  setSyncState: (status: AppState['syncStatus'], lastSyncedAt?: string | null) => void;
   setUserProfile: (profile: UserProfile) => void;
   addWorkout: (workout: Workout) => void;
   removeWorkout: (id: string) => void;
@@ -164,6 +170,8 @@ export interface AppState {
   saveData: () => Promise<void>;
   // Apply a remote snapshot during sync without bumping the local clock.
   applyRemoteState: (data: RemoteSnapshot, remoteUpdatedAt: string) => Promise<void>;
+  // Reset the device-local cache to a fresh baseline (used on logout / account deletion).
+  clearLocalData: () => Promise<void>;
 }
 
 // Subset of state synced to/from Supabase.

@@ -49,6 +49,12 @@ export const useStore = create<AppState>((set, get) => ({
   calorieGoal: 2000,
   currentStreak: 0,
   dataUpdatedAt: '1970-01-01T00:00:00.000Z',
+  syncStatus: 'idle',
+  lastSyncedAt: null,
+
+  setSyncState: (status, lastSyncedAt) => {
+    set(lastSyncedAt !== undefined ? { syncStatus: status, lastSyncedAt } : { syncStatus: status });
+  },
 
   setUserProfile: (profile) => {
     set({ userProfile: profile });
@@ -374,6 +380,39 @@ export const useStore = create<AppState>((set, get) => ({
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
     } catch (error) {
       console.error('Failed to persist remote state:', error);
+    }
+  },
+
+  clearLocalData: async () => {
+    // Reset to a fresh baseline so a different user on this device can't see
+    // the previous user's cached data. Cloud data is untouched (that's what
+    // delete-account is for).
+    set({
+      userProfile: null,
+      workouts: [],
+      meals: [],
+      bmiRecords: [],
+      bodyMeasurements: [],
+      progressPhotos: [],
+      goals: [],
+      integrations: [
+        { id: 'fitbit', name: 'fitbit', connected: false },
+        { id: 'apple_health', name: 'apple_health', connected: false },
+        { id: 'google_fit', name: 'google_fit', connected: false },
+        { id: 'strava', name: 'strava', connected: false },
+        { id: 'myfitnesspal', name: 'myfitnesspal', connected: false },
+      ],
+      friends: [],
+      supplements: DEFAULT_SUPPLEMENTS,
+      weeklyGoal: 3,
+      calorieGoal: 2000,
+      currentStreak: 0,
+      dataUpdatedAt: '1970-01-01T00:00:00.000Z',
+    });
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+      console.error('Failed to clear local data:', error);
     }
   },
 }));

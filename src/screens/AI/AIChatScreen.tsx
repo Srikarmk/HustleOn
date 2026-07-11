@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SIZES } from '../../constants/theme';
-import { generateGeminiResponse, FITNESS_COACH_PROMPT, ChatTurn } from '../../config/gemini';
+import { generateGeminiResponse, FITNESS_COACH_PROMPT, ChatTurn, AI_DISCLAIMER } from '../../config/gemini';
 
 interface Message {
   id: string;
@@ -205,6 +205,8 @@ export const AIChatScreen: React.FC = () => {
           )}
         </ScrollView>
 
+        <Text style={styles.disclaimer}>{AI_DISCLAIMER}</Text>
+
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -329,6 +331,13 @@ const styles = StyleSheet.create({
   loadingText: {
     color: COLORS.textSecondary,
     fontSize: 14,
+  },
+  disclaimer: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: SIZES.padding,
+    paddingBottom: 6,
   },
   inputContainer: {
     flexDirection: 'row',

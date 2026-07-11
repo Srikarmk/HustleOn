@@ -35,7 +35,10 @@ let syncing = false;
 
 const isRemoteUri = (uri: string) => /^https?:\/\//.test(uri);
 
-/** Upload a local file:// image to Storage; returns its public URL (or null on failure). */
+// Signed URLs last 7 days; they're refreshed on every sync (launch + foreground).
+const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7;
+
+/** Upload a local file:// image to the private bucket; returns the object path (or null). */
 async function uploadPhoto(userId: string, uri: string): Promise<string | null> {
   try {
     const response = await fetch(uri);
@@ -51,26 +54,38 @@ async function uploadPhoto(userId: string, uri: string): Promise<string | null> 
       console.error('Photo upload failed:', error.message);
       return null;
     }
-    const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
-    return data.publicUrl;
+    return path;
   } catch (error) {
     console.error('Photo upload error:', error);
     return null;
   }
 }
 
-/** Replace any local file:// photo/profile URIs with uploaded Storage URLs. */
+/** Create a short-lived signed URL for a private object path (or null on failure). */
+async function signPath(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  if (error) {
+    console.error('Failed to sign photo path:', error.message);
+    return null;
+  }
+  return data?.signedUrl ?? null;
+}
+
+/** Upload any not-yet-uploaded local photos; store the object path + a fresh signed URL. */
 async function uploadPendingPhotos(userId: string): Promise<void> {
   const state = useStore.getState();
   let changed = false;
 
   const photos = await Promise.all(
     state.progressPhotos.map(async (photo) => {
-      if (!isRemoteUri(photo.uri)) {
-        const url = await uploadPhoto(userId, photo.uri);
-        if (url) {
+      if (!photo.storagePath && photo.uri && !isRemoteUri(photo.uri)) {
+        const path = await uploadPhoto(userId, photo.uri);
+        if (path) {
           changed = true;
-          return { ...photo, uri: url };
+          const signed = await signPath(path);
+          return { ...photo, storagePath: path, uri: signed ?? photo.uri };
         }
       }
       return photo;
@@ -78,17 +93,26 @@ async function uploadPendingPhotos(userId: string): Promise<void> {
   );
 
   let userProfile = state.userProfile;
-  if (userProfile?.profilePictureUri && !isRemoteUri(userProfile.profilePictureUri)) {
-    const url = await uploadPhoto(userId, userProfile.profilePictureUri);
-    if (url) {
+  if (
+    userProfile?.profilePictureUri &&
+    !userProfile.profilePicturePath &&
+    !isRemoteUri(userProfile.profilePictureUri)
+  ) {
+    const path = await uploadPhoto(userId, userProfile.profilePictureUri);
+    if (path) {
       changed = true;
-      userProfile = { ...userProfile, profilePictureUri: url };
+      const signed = await signPath(path);
+      userProfile = {
+        ...userProfile,
+        profilePicturePath: path,
+        profilePictureUri: signed ?? userProfile.profilePictureUri,
+      };
     }
   }
 
   if (changed) {
     useStore.setState({ progressPhotos: photos, userProfile });
-    // saveData() bumps the clock + persists; the new URLs become the value we push.
+    // saveData() bumps the clock + persists; the object paths become what we push.
     await useStore.getState().saveData();
   }
 }
@@ -127,8 +151,25 @@ async function pull(userId: string, remoteTs: string): Promise<void> {
     collectionResults[key] = (data ?? []).map((r) => r.data);
   }
 
+  // Photos come back with their private object path; mint fresh signed URLs for display.
+  const progressPhotos = await Promise.all(
+    collectionResults.progressPhotos.map(async (photo: any) => {
+      if (photo?.storagePath) {
+        const signed = await signPath(photo.storagePath);
+        return signed ? { ...photo, uri: signed } : photo;
+      }
+      return photo;
+    })
+  );
+
+  let userProfile = pdata.userProfile ?? null;
+  if (userProfile?.profilePicturePath) {
+    const signed = await signPath(userProfile.profilePicturePath);
+    if (signed) userProfile = { ...userProfile, profilePictureUri: signed };
+  }
+
   const snapshot: RemoteSnapshot = {
-    userProfile: pdata.userProfile ?? null,
+    userProfile,
     privacySettings: pdata.privacySettings ?? current.privacySettings,
     themeSettings: pdata.themeSettings ?? current.themeSettings,
     notificationPreferences: pdata.notificationPreferences ?? current.notificationPreferences,
@@ -142,7 +183,7 @@ async function pull(userId: string, remoteTs: string): Promise<void> {
     goals: collectionResults.goals,
     friends: collectionResults.friends,
     supplements: collectionResults.supplements,
-    progressPhotos: collectionResults.progressPhotos,
+    progressPhotos,
   };
 
   await useStore.getState().applyRemoteState(snapshot, remoteTs);
@@ -203,6 +244,8 @@ export async function syncNow(): Promise<void> {
   if (!userId) return;
 
   syncing = true;
+  const store = useStore.getState();
+  store.setSyncState('syncing');
   try {
     const remoteTs = await fetchRemoteClock(userId);
     const localTs = useStore.getState().dataUpdatedAt;
@@ -217,9 +260,11 @@ export async function syncNow(): Promise<void> {
       await push(userId, ts);
     }
     // equal -> nothing to do
+    useStore.getState().setSyncState('synced', new Date().toISOString());
   } catch (error) {
     // Offline or transient failure — try again on the next trigger.
     console.error('Sync failed:', error);
+    useStore.getState().setSyncState('error');
   } finally {
     syncing = false;
   }

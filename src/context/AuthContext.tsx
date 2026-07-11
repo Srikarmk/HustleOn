@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { useStore } from '../store';
 
 interface SignInResult {
   error: string | null;
@@ -22,6 +24,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
+  deleteAccount: () => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -32,6 +35,7 @@ const AuthContext = createContext<AuthContextType>({
   signUp: async () => ({ error: 'Auth not ready', needsConfirmation: false }),
   signOut: async () => {},
   resetPassword: async () => ({ error: 'Auth not ready' }),
+  deleteAccount: async () => ({ error: 'Auth not ready' }),
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -93,7 +97,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async (): Promise<void> => {
+    // Clear the device-local cache so the next user on this device doesn't
+    // inherit the previous user's data (data is already cloud-backed via sync).
+    await useStore.getState().clearLocalData();
     await supabase.auth.signOut();
+  };
+
+  const deleteAccount = async (): Promise<{ error: string | null }> => {
+    const { data, error } = await supabase.functions.invoke('delete-account', { body: {} });
+    if (error) return { error: error.message };
+    if (data?.error) return { error: data.error as string };
+    // Wipe local cache + chat history, then sign out.
+    await useStore.getState().clearLocalData();
+    try {
+      await AsyncStorage.removeItem('@hustleon:ai_chat');
+    } catch {
+      // best-effort
+    }
+    await supabase.auth.signOut();
+    return { error: null };
   };
 
   const resetPassword = async (email: string): Promise<{ error: string | null }> => {
@@ -111,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         signOut,
         resetPassword,
+        deleteAccount,
       }}
     >
       {children}

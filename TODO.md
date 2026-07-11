@@ -7,20 +7,23 @@ See [`README.md`](README.md) for setup and [`CLAUDE.md`](CLAUDE.md) for the full
 
 ## ▶️ Next up (recommended sequence)
 
-1. **You:** run the 3 Supabase manual steps below → unlocks live end-to-end verification of Phases 1–3.
-2. **You, when Apple enrollment clears:** confirm the bundle id, run `eas init`, fill the Apple IDs in `eas.json`, then `eas build` → `eas submit`. See [`docs/app-store-checklist.md`](docs/app-store-checklist.md).
-3. **You + me, when ready:** Phase 1b (Apple + Google sign-in) — needs a Google iOS OAuth client ID from you.
+1. **You:** run the Supabase manual steps below (2 migrations + 2 functions + secret) → unlocks live end-to-end verification.
+2. **You:** host Privacy Policy + Terms pages and update the placeholder URLs in `ProfileScreen.tsx` (Tier-1 App Store blocker).
+3. **You, when Apple enrollment clears:** confirm the bundle id, run `eas init`, fill the Apple IDs in `eas.json`, then `eas build` → `eas submit`. See [`docs/app-store-checklist.md`](docs/app-store-checklist.md).
+4. **You + me:** Phase 1b (Apple + Google sign-in) — needs a Google iOS OAuth client ID from you.
+
+Full ship checklist: [`docs/production-readiness.md`](docs/production-readiness.md).
 
 ---
 
 ## 🚨 Manual steps required (you must do these — code is ready)
 
-- [ ] **Run the SQL migration** — `supabase/migrations/0001_init.sql` in the Supabase SQL Editor (creates tables, RLS, Storage bucket). *Without this, cloud sync fails silently.*
-- [ ] **Deploy the Edge Function** — `supabase functions deploy gemini-proxy`. *Without this, AI features error.*
+- [ ] **Run the SQL migrations** — `0001_init.sql` then `0002_production.sql` in the Supabase SQL Editor. *Without 0001, cloud sync fails silently; 0002 makes photos private + adds AI rate-limiting.*
+- [ ] **Deploy the Edge Functions** — `supabase functions deploy gemini-proxy` and `supabase functions deploy delete-account`.
 - [ ] **Set the Gemini secret** — `supabase secrets set GEMINI_API_KEY=AIza...`
 - [ ] *(dev)* Disable email confirmation in Supabase Auth so signup logs in immediately.
 
-See [`supabase/README.md`](supabase/README.md) for exact commands.
+See [`supabase/README.md`](supabase/README.md) for exact commands, and [`docs/production-readiness.md`](docs/production-readiness.md) for the full ship checklist.
 
 ---
 
@@ -49,6 +52,15 @@ See [`supabase/README.md`](supabase/README.md) for exact commands.
 - [x] **Phase 1a** — Supabase email/password auth
 - [x] **Phase 2** — local-first cloud sync (tables, RLS, Storage, photo upload)
 - [x] **Phase 3** — Gemini behind `gemini-proxy` Edge Function
+- [x] **Multi-turn AI** — conversation history sent to Gemini
+- [x] **Phase 4 build config** — `eas.json`, bundle id, privacy manifest
+
+### Production hardening (code done — see docs/production-readiness.md)
+- [x] In-app **account deletion** (Tier-1 blocker) — `delete-account` function + Profile UI
+- [x] **Private** progress-photo bucket + signed URLs (was public)
+- [x] AI **rate-limit** (60/user/day) + prompt cap + **medical disclaimer**
+- [x] Legal links wired (Privacy / Terms / Support) — *update placeholder URLs*
+- [x] **Sync-status UX** + local-cache clear on logout/delete
 - [x] **Multi-turn AI memory** — AI coach sends conversation history (capped 20 turns) via `systemInstruction` + multi-turn `contents`
 - [x] **Phase 4 build config (code)** — `eas.json`, iOS `bundleIdentifier` (placeholder) + `buildNumber`, `ios.privacyManifests`, App Store checklist doc
 

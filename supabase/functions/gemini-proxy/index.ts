@@ -20,6 +20,10 @@ const corsHeaders = {
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
+// Cost guards
+const DAILY_AI_LIMIT = 60; // max Gemini calls per user per UTC day
+const MAX_PROMPT_CHARS = 8000;
+
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -38,12 +42,14 @@ serve(async (req: Request) => {
       return json({ error: 'Missing authorization header.' }, 401);
     }
 
+    const url = Deno.env.get('SUPABASE_URL') ?? '';
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
     // Verify the caller is a real, signed-in user.
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabase = createClient(url, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
     const {
       data: { user },
       error: userError,
@@ -60,6 +66,24 @@ serve(async (req: Request) => {
     const { prompt, systemPrompt, history } = await req.json();
     if (!prompt || typeof prompt !== 'string') {
       return json({ error: 'Missing prompt.' }, 400);
+    }
+    if (prompt.length > MAX_PROMPT_CHARS) {
+      return json({ error: 'Prompt is too long.' }, 400);
+    }
+
+    // Per-user daily rate limit (cost guard). Atomic increment via RPC.
+    if (serviceKey) {
+      const admin = createClient(url, serviceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: usageCount, error: usageError } = await admin.rpc('increment_ai_usage', {
+        p_user_id: user.id,
+      });
+      if (usageError) {
+        console.error('Rate-limit check failed (allowing request):', usageError.message);
+      } else if (typeof usageCount === 'number' && usageCount > DAILY_AI_LIMIT) {
+        return json({ error: 'Daily AI limit reached. Please try again tomorrow.' }, 429);
+      }
     }
 
     // Build multi-turn contents: prior history (if any) + the current user turn.

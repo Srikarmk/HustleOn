@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useStore } from '../../store';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
-import { generateGeminiResponse } from '../../config/gemini';
+import { generateGeminiResponse, AI_DISCLAIMER } from '../../config/gemini';
 
 export const SummaryScreen: React.FC = () => {
   const { workouts, meals } = useStore();
@@ -290,9 +290,12 @@ export const SummaryScreen: React.FC = () => {
                 <Text style={styles.loadingText}>Analyzing your progress...</Text>
               </View>
             ) : (
-              <ScrollView style={styles.aiResponseContainer}>
-                <Text style={styles.aiResponseText}>{aiResponse}</Text>
-              </ScrollView>
+              <>
+                <ScrollView style={styles.aiResponseContainer}>
+                  <Text style={styles.aiResponseText}>{aiResponse}</Text>
+                </ScrollView>
+                <Text style={styles.aiDisclaimer}>{AI_DISCLAIMER}</Text>
+              </>
             )}
           </View>
         </View>
@@ -386,6 +389,12 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.body,
     lineHeight: 24,
+  },
+  aiDisclaimer: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 12,
   },
   monthNav: {
     flexDirection: 'row',

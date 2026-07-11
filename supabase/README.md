@@ -7,20 +7,24 @@ Backend setup for HustleOn: Postgres schema + RLS, a Storage bucket for photos, 
 
 ```
 supabase/
-├── migrations/0001_init.sql   # Tables + RLS + Storage bucket (run once)
-└── functions/gemini-proxy/    # Edge Function (deploy once; redeploy on change)
+├── migrations/
+│   ├── 0001_init.sql          # Tables + RLS + Storage bucket
+│   └── 0002_production.sql    # Private photo bucket + ai_usage rate-limit table
+└── functions/
+    ├── gemini-proxy/          # AI proxy (holds the Gemini key; rate-limited)
+    └── delete-account/        # In-app account deletion (App Store requirement)
 ```
 
 ---
 
 ## 1. Database schema + RLS + Storage bucket
 
-Run [`migrations/0001_init.sql`](migrations/0001_init.sql) once. It is idempotent (safe to re-run).
+Run both migrations in order (idempotent, safe to re-run).
 
 **Easiest — SQL Editor:**
 1. Supabase Dashboard → **SQL Editor** → **New query**
-2. Paste the entire contents of `migrations/0001_init.sql`
-3. **Run**
+2. Paste + **Run** `migrations/0001_init.sql`
+3. Paste + **Run** `migrations/0002_production.sql` (makes the photo bucket private, adds the `ai_usage` rate-limit table)
 
 **Or via CLI:**
 ```bash
@@ -52,13 +56,15 @@ supabase link --project-ref xwpiwpozjhrzepxbtgaf
 # Set the Gemini key as a secret (get one at https://aistudio.google.com/apikey)
 supabase secrets set GEMINI_API_KEY=AIza...your_key...
 
-# Deploy (re-run after any change to functions/gemini-proxy/index.ts)
+# Deploy both Edge Functions (re-run after any change to their index.ts)
 supabase functions deploy gemini-proxy
+supabase functions deploy delete-account
 ```
 
 - **Auth:** JWT verification is on by default — unauthenticated calls are rejected.
-- **Logs:** Dashboard → **Edge Functions → gemini-proxy → Logs**.
-- **Model:** `gemini-2.5-flash`. Request body: `{ prompt, systemPrompt }` → response `{ text }`.
+- **Logs:** Dashboard → **Edge Functions → <name> → Logs**.
+- **gemini-proxy:** `gemini-2.5-flash`. Body `{ prompt, systemPrompt, history? }` → `{ text }`. Rate-limited to 60 calls/user/day (via the `ai_usage` table) with an 8k-char prompt cap.
+- **delete-account:** deletes all of the caller's rows + storage files + their auth user (App Store guideline 5.1.1(v)). Uses the auto-injected `SUPABASE_SERVICE_ROLE_KEY`.
 
 ---
 

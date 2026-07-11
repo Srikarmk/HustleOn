@@ -18,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../../store';
 import { COLORS, SIZES } from '../../constants/theme';
-import { generateGeminiResponse } from '../../config/gemini';
+import { generateGeminiResponse, AI_DISCLAIMER } from '../../config/gemini';
 import { BodyMeasurement, ProgressPhoto } from '../../types';
 
 export const BMICalculatorScreen: React.FC = () => {
@@ -769,9 +769,12 @@ export const BMICalculatorScreen: React.FC = () => {
                 <Text style={styles.loadingText}>Getting personalized advice...</Text>
               </View>
             ) : (
-              <ScrollView style={styles.aiResponseContainer}>
-                <Text style={styles.aiResponseText}>{aiResponse}</Text>
-              </ScrollView>
+              <>
+                <ScrollView style={styles.aiResponseContainer}>
+                  <Text style={styles.aiResponseText}>{aiResponse}</Text>
+                </ScrollView>
+                <Text style={styles.aiDisclaimer}>{AI_DISCLAIMER}</Text>
+              </>
             )}
           </View>
         </View>
@@ -1418,6 +1421,12 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 15,
     lineHeight: 24,
+  },
+  aiDisclaimer: {
+    fontSize: 10,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 12,
   },
   bottomPadding: {
     height: 30,

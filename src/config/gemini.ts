@@ -7,6 +7,10 @@ export interface ChatTurn {
   text: string;
 }
 
+/** Shown near every AI surface. Fitness guidance, not medical advice. */
+export const AI_DISCLAIMER =
+  'AI guidance is general fitness information, not medical advice. Consult a healthcare professional before making health decisions.';
+
 /**
  * Send a prompt to Gemini via the secure proxy.
  * Requires an authenticated Supabase session (the JWT is attached automatically).
