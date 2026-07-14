@@ -10,6 +10,8 @@ import {
   TextInput,
   Alert,
   Animated,
+  RefreshControl,
+  LayoutAnimation,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +22,7 @@ import { FadeInView } from '../../components/FadeInView';
 import { PressableScale } from '../../components/PressableScale';
 import { AnimatedProgressBar } from '../../components/AnimatedProgressBar';
 import { haptics } from '../../utils/haptics';
+import { useSyncRefresh } from '../../hooks/useSyncRefresh';
 
 export const WorkoutTrackerScreen: React.FC = () => {
   const {
@@ -34,6 +37,7 @@ export const WorkoutTrackerScreen: React.FC = () => {
     toggleSupplementTaken,
   } = useStore();
   const navigation = useNavigation<any>();
+  const { refreshing, onRefresh } = useSyncRefresh();
 
   // Streak number pops when it changes.
   const streakScale = useRef(new Animated.Value(1)).current;
@@ -84,7 +88,13 @@ export const WorkoutTrackerScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.gradient}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+          }
+        >
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -156,7 +166,9 @@ export const WorkoutTrackerScreen: React.FC = () => {
                 fillStyle={styles.progressBar}
               />
               <Text style={styles.goalSubtext}>
-                {Math.max(0, weeklyGoal - workoutsThisWeek)} more to reach your goal
+                {workoutsThisWeek >= weeklyGoal
+                  ? '🎉 Goal crushed this week — keep hustling!'
+                  : `${weeklyGoal - workoutsThisWeek} more to reach your goal`}
               </Text>
             </View>
           </FadeInView>
@@ -211,7 +223,14 @@ export const WorkoutTrackerScreen: React.FC = () => {
                         onPress={() =>
                           Alert.alert('Remove Supplement', `Remove "${supp.name}"?`, [
                             { text: 'Cancel', style: 'cancel' },
-                            { text: 'Remove', style: 'destructive', onPress: () => removeSupplement(supp.id) },
+                            {
+                              text: 'Remove',
+                              style: 'destructive',
+                              onPress: () => {
+                                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                                removeSupplement(supp.id);
+                              },
+                            },
                           ])
                         }
                       >
@@ -327,6 +346,7 @@ export const WorkoutTrackerScreen: React.FC = () => {
                   Alert.alert('Error', 'Please enter a supplement name');
                   return;
                 }
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                 addSupplement({
                   id: Date.now().toString(),
                   name: suppName.trim(),

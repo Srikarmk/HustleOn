@@ -8,16 +8,19 @@ import {
   SafeAreaView,
   Modal,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useStore } from '../../store';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
 import { generateGeminiResponse, AI_DISCLAIMER } from '../../config/gemini';
+import { useSyncRefresh } from '../../hooks/useSyncRefresh';
 
 export const SummaryScreen: React.FC = () => {
   const { workouts, meals } = useStore();
   const navigation = useNavigation<any>();
+  const { refreshing, onRefresh } = useSyncRefresh();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiResponse, setAiResponse] = useState('');
@@ -141,7 +144,13 @@ export const SummaryScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.gradient}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+          }
+        >
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>

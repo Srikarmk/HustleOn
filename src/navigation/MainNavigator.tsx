@@ -13,6 +13,7 @@ import { FloatingAIButton } from '../components/FloatingAIButton';
 import { MainTabParamList, RootStackParamList } from '../types';
 import { COLORS } from '../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { haptics } from '../utils/haptics';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -58,6 +59,10 @@ export const MainNavigator: React.FC = () => {
 
   return (
     <Tab.Navigator
+      screenListeners={{
+        // Subtle tick when switching tabs.
+        tabPress: () => haptics.selection(),
+      }}
       screenOptions={{
         headerShown: false,
         tabBarStyle: {

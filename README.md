@@ -71,6 +71,20 @@ npm start         # Expo dev server (choose a target)
 npm test          # Run the Jest test suite
 ```
 
+### Test on a real iPhone — no paid Apple account needed
+
+**Expo Go (fastest):**
+1. Install **Expo Go** from the App Store (free).
+2. Phone + Mac on the same Wi-Fi, then run `npx expo start` (LAN mode — not the `--localhost` ios script).
+3. Scan the QR code with the iPhone camera.
+   *Limits: notifications/badges are only partially supported inside Expo Go.*
+
+**Free Apple ID dev build (full experience — notifications, badges, haptics):**
+1. Xcode → Settings → Accounts → add your free Apple ID (creates a "Personal Team").
+2. Connect the iPhone via cable and run `npx expo run:ios --device`.
+3. On the phone: Settings → General → VPN & Device Management → trust the developer profile.
+   *Free-team signatures expire after 7 days — re-run the command to reinstall.*
+
 On first launch you'll go through onboarding → sign up / log in → the main tabs. AI features and cross-device sync require step 3 to be complete.
 
 ---

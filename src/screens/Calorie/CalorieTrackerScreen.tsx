@@ -12,6 +12,8 @@ import {
   Alert,
   Keyboard,
   TouchableWithoutFeedback,
+  RefreshControl,
+  LayoutAnimation,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -21,10 +23,12 @@ import { generateGeminiResponse, AI_DISCLAIMER } from '../../config/gemini';
 import { PressableScale } from '../../components/PressableScale';
 import { AnimatedProgressBar } from '../../components/AnimatedProgressBar';
 import { haptics } from '../../utils/haptics';
+import { useSyncRefresh } from '../../hooks/useSyncRefresh';
 
 export const CalorieTrackerScreen: React.FC = () => {
   const { meals, calorieGoal, setCalorieGoal, addMeal, removeMeal } = useStore();
   const navigation = useNavigation<any>();
+  const { refreshing, onRefresh } = useSyncRefresh();
   const [today] = useState(new Date().toISOString().split('T')[0]);
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiResponse, setAiResponse] = useState('');
@@ -66,7 +70,13 @@ export const CalorieTrackerScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.gradient}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+          }
+        >
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -167,7 +177,12 @@ export const CalorieTrackerScreen: React.FC = () => {
                     </View>
                     <View style={styles.mealRight}>
                       <Text style={styles.mealCalories}>{meal.calories} cal</Text>
-                      <TouchableOpacity onPress={() => removeMeal(meal.id)}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                          removeMeal(meal.id);
+                        }}
+                      >
                         <Ionicons name="trash-outline" size={20} color={COLORS.error} />
                       </TouchableOpacity>
                     </View>
