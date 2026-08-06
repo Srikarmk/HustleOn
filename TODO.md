@@ -65,6 +65,12 @@ See [`supabase/README.md`](supabase/README.md) for exact commands, and [`docs/pr
 - [x] **Test suite** (`npm test`) — 17 tests (store, sync LWW decision, monitoring)
 - [x] **NetInfo offline detection** — sync skips offline, retries on reconnect, shown in Profile
 - [x] **Dark splash** — `userInterfaceStyle: dark` + dark splash background
+
+### Polish & delight (see CHANGELOG.md for detail)
+- [x] **Code-completeness audit** — rendered the missing Goal/Layout/Friends modals, wired "Change" buttons; every interactive element now does something real
+- [x] **Motion + haptics** — FadeInView / PressableScale / AnimatedProgressBar primitives; FAB pulse, streak pop, animated bars, press springs, success/selection haptics
+- [x] **Workability + fun** — tab-switch haptics, pull-to-refresh manual sync, "Goal crushed" celebration, LayoutAnimation list motion
+- [x] **Phone testing docs** — README covers Expo Go + free-Apple-ID dev build (no TestFlight needed)
 - [x] **Multi-turn AI memory** — AI coach sends conversation history (capped 20 turns) via `systemInstruction` + multi-turn `contents`
 - [x] **Phase 4 build config (code)** — `eas.json`, iOS `bundleIdentifier` (placeholder) + `buildNumber`, `ios.privacyManifests`, App Store checklist doc
 
