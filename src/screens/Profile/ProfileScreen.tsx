@@ -21,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 import { useStore } from '../../store';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
+import { parseISODate, todayISO } from '../../utils/date';
 import { useAuth } from '../../context/AuthContext';
 import { scheduleAllNotifications } from '../../utils/notifications';
 import { Goal, Integration, NotificationPreference } from '../../types';
@@ -252,7 +253,7 @@ export const ProfileScreen: React.FC = () => {
       };
 
       const jsonData = JSON.stringify(allData, null, 2);
-      const fileName = `hustleon_export_${new Date().toISOString().split('T')[0]}.json`;
+      const fileName = `hustleon_export_${todayISO()}.json`;
       const fileUri = `${FileSystem.documentDirectory}${fileName}`;
 
       await FileSystem.writeAsStringAsync(fileUri, jsonData);
@@ -426,7 +427,7 @@ export const ProfileScreen: React.FC = () => {
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Date of Birth</Text>
                 <Text style={styles.readOnlyValue}>
-                  {new Date(profile.dateOfBirth).toLocaleDateString('en-US', { 
+                  {parseISODate(profile.dateOfBirth).toLocaleDateString('en-US', { 
                     year: 'numeric', 
                     month: 'long', 
                     day: 'numeric' 
@@ -593,7 +594,7 @@ export const ProfileScreen: React.FC = () => {
                       <View>
                         <Text style={styles.goalCardTitle}>{goal.title}</Text>
                         <Text style={styles.goalCardTarget}>
-                          Target: {goal.targetValue} {goal.unit} by {new Date(goal.targetDate).toLocaleDateString()}
+                          Target: {goal.targetValue} {goal.unit} by {parseISODate(goal.targetDate).toLocaleDateString()}
                         </Text>
                       </View>
                     </View>

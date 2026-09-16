@@ -23,6 +23,8 @@ import { PressableScale } from '../../components/PressableScale';
 import { AnimatedProgressBar } from '../../components/AnimatedProgressBar';
 import { haptics } from '../../utils/haptics';
 import { useSyncRefresh } from '../../hooks/useSyncRefresh';
+import { useToday } from '../../hooks/useToday';
+import { addDays, dayNumber, parseISODate, toISODate, todayISO } from '../../utils/date';
 
 export const WorkoutTrackerScreen: React.FC = () => {
   const {
@@ -49,22 +51,19 @@ export const WorkoutTrackerScreen: React.FC = () => {
     ]).start();
   }, [currentStreak, streakScale]);
 
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0]
-  );
+  const [selectedDate, setSelectedDate] = useState(todayISO);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const today = new Date().toISOString().split('T')[0];
+  const today = useToday();
   const [showSupplementModal, setShowSupplementModal] = useState(false);
   const [suppName, setSuppName] = useState('');
   const [suppDosage, setSuppDosage] = useState('');
 
+  // "This week" is the week containing today — not the month the calendar
+  // happens to be scrolled to, which is what this used to anchor on.
+  const weekStart = dayNumber(addDays(new Date(), -new Date().getDay()));
   const workoutsThisWeek = workouts.filter((w) => {
-    const workoutDate = new Date(w.date);
-    const weekStart = new Date(currentMonth);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    return workoutDate >= weekStart && workoutDate <= weekEnd;
+    const day = dayNumber(parseISODate(w.date));
+    return day >= weekStart && day <= weekStart + 6;
   }).length;
 
   const markedDates: { [key: string]: any } = {};
@@ -125,7 +124,6 @@ export const WorkoutTrackerScreen: React.FC = () => {
             <PressableScale
               style={styles.workoutTodayButton}
               onPress={() => {
-                const today = new Date().toISOString().split('T')[0];
                 const existingWorkout = workouts.find((w) => w.date === today);
                 if (!existingWorkout) {
                   addWorkout({
@@ -260,9 +258,9 @@ export const WorkoutTrackerScreen: React.FC = () => {
           {/* Calendar */}
           <View style={styles.card}>
             <Calendar
-              current={currentMonth.toISOString().split('T')[0]}
+              current={toISODate(currentMonth)}
               onMonthChange={(month: any) => {
-                setCurrentMonth(new Date(month.dateString));
+                setCurrentMonth(parseISODate(month.dateString));
               }}
               markedDates={{
                 ...markedDates,

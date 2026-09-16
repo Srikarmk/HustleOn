@@ -18,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../../store';
 import { COLORS, SIZES } from '../../constants/theme';
+import { parseISODate, toISODate, todayISO } from '../../utils/date';
 import { generateGeminiResponse, AI_DISCLAIMER } from '../../config/gemini';
 import { FadeInView } from '../../components/FadeInView';
 import { PressableScale } from '../../components/PressableScale';
@@ -114,7 +115,7 @@ export const BMICalculatorScreen: React.FC = () => {
     // Save to store
     addBMIRecord({
       id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
+      date: todayISO(),
       weight: w,
       height: h,
       bmi: calculatedBMI,
@@ -184,7 +185,7 @@ export const BMICalculatorScreen: React.FC = () => {
   // Moving Average Calculation
   const calculateMovingAverage = (records: any[], days: number = 7): number[] => {
     if (records.length === 0) return [];
-    const sorted = [...records].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sorted = [...records].sort((a, b) => parseISODate(a.date).getTime() - parseISODate(b.date).getTime());
     const averages: number[] = [];
     for (let i = 0; i < sorted.length; i++) {
       const window = sorted.slice(Math.max(0, i - days + 1), i + 1);
@@ -197,12 +198,12 @@ export const BMICalculatorScreen: React.FC = () => {
   // Predict Trajectory
   const predictTrajectory = (records: any[], goalWeight: number): { days: number; date: string } | null => {
     if (records.length < 2) return null;
-    const sorted = [...records].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sorted = [...records].sort((a, b) => parseISODate(a.date).getTime() - parseISODate(b.date).getTime());
     const recent = sorted.slice(-7);
     if (recent.length < 2) return null;
 
     const weightDiff = recent[recent.length - 1].weight - recent[0].weight;
-    const daysDiff = (new Date(recent[recent.length - 1].date).getTime() - new Date(recent[0].date).getTime()) / (1000 * 60 * 60 * 24);
+    const daysDiff = (parseISODate(recent[recent.length - 1].date).getTime() - parseISODate(recent[0].date).getTime()) / (1000 * 60 * 60 * 24);
     const ratePerDay = weightDiff / daysDiff;
 
     if (Math.abs(ratePerDay) < 0.01) return null;
@@ -214,13 +215,13 @@ export const BMICalculatorScreen: React.FC = () => {
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + daysNeeded);
 
-    return { days: Math.round(daysNeeded), date: targetDate.toISOString().split('T')[0] };
+    return { days: Math.round(daysNeeded), date: toISODate(targetDate) };
   };
 
   // Health Insights
   const getHealthInsights = (): string => {
     if (bmiRecords.length < 2) return '';
-    const sorted = [...bmiRecords].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sorted = [...bmiRecords].sort((a, b) => parseISODate(a.date).getTime() - parseISODate(b.date).getTime());
     const first = sorted[0];
     const last = sorted[sorted.length - 1];
     const bmiChange = last.bmi - first.bmi;
@@ -253,7 +254,7 @@ export const BMICalculatorScreen: React.FC = () => {
     if (!result.canceled && result.assets[0]) {
       const photo: ProgressPhoto = {
         id: Date.now().toString(),
-        date: new Date().toISOString().split('T')[0],
+        date: todayISO(),
         uri: result.assets[0].uri,
       };
       addProgressPhoto(photo);
@@ -270,7 +271,7 @@ export const BMICalculatorScreen: React.FC = () => {
 
     const measurement: BodyMeasurement = {
       id: Date.now().toString(),
-      date: new Date().toISOString().split('T')[0],
+      date: todayISO(),
       chest: measurements.chest ? parseFloat(measurements.chest) : undefined,
       waist: measurements.waist ? parseFloat(measurements.waist) : undefined,
       hips: measurements.hips ? parseFloat(measurements.hips) : undefined,
@@ -288,14 +289,14 @@ export const BMICalculatorScreen: React.FC = () => {
   // Get Latest Measurements
   const getLatestMeasurements = () => {
     if (bodyMeasurements.length === 0) return null;
-    const sorted = [...bodyMeasurements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const sorted = [...bodyMeasurements].sort((a, b) => parseISODate(b.date).getTime() - parseISODate(a.date).getTime());
     return sorted[0];
   };
 
   // Get Latest BMI Record with Body Composition
   const getLatestBMIWithComposition = () => {
     if (bmiRecords.length === 0) return null;
-    const sorted = [...bmiRecords].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const sorted = [...bmiRecords].sort((a, b) => parseISODate(b.date).getTime() - parseISODate(a.date).getTime());
     return sorted[0];
   };
 
@@ -486,7 +487,7 @@ export const BMICalculatorScreen: React.FC = () => {
                     {bmiRecords.slice(-5).reverse().map((record) => (
                       <View key={record.id} style={styles.historyItem}>
                         <Text style={styles.historyDate}>
-                          {new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          {parseISODate(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </Text>
                         <Text style={styles.historyBMI}>{record.bmi.toFixed(1)}</Text>
                         <View
@@ -586,7 +587,7 @@ export const BMICalculatorScreen: React.FC = () => {
                     <FlatList
                       horizontal
                       nestedScrollEnabled
-                      data={[...progressPhotos].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())}
+                      data={[...progressPhotos].sort((a, b) => parseISODate(b.date).getTime() - parseISODate(a.date).getTime())}
                       keyExtractor={(item) => item.id}
                       showsHorizontalScrollIndicator={false}
                       renderItem={({ item, index }) => (
@@ -599,7 +600,7 @@ export const BMICalculatorScreen: React.FC = () => {
                         >
                           <Image source={{ uri: item.uri }} style={styles.photoThumbnail} />
                           <Text style={styles.photoDate}>
-                            {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {parseISODate(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -705,7 +706,7 @@ export const BMICalculatorScreen: React.FC = () => {
                             Predicted goal achievement: {trajectory.days} days
                           </Text>
                           <Text style={styles.predictionDate}>
-                            Target date: {new Date(trajectory.date).toLocaleDateString()}
+                            Target date: {parseISODate(trajectory.date).toLocaleDateString()}
                           </Text>
                         </View>
                       </View>
@@ -891,7 +892,7 @@ export const BMICalculatorScreen: React.FC = () => {
             <View style={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}>
               <Image
                 source={{
-                  uri: [...progressPhotos].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[
+                  uri: [...progressPhotos].sort((a, b) => parseISODate(b.date).getTime() - parseISODate(a.date).getTime())[
                     selectedPhotoIndex
                   ]?.uri,
                 }}

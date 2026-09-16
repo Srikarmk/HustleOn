@@ -1,8 +1,10 @@
 import { useStore } from '../index';
+import { addDays, toISODate, todayISO } from '../../utils/date';
 import type { Workout, Meal, Goal, RemoteSnapshot } from '../../types';
 
-const iso = (d: Date) => d.toISOString().split('T')[0];
-const daysAgo = (n: number) => iso(new Date(Date.now() - n * 86400000));
+// Dates must be built the same way the app builds them: on the LOCAL calendar.
+// Using toISOString() here was what made these tests disagree with the app.
+const daysAgo = (n: number) => toISODate(addDays(new Date(), -n));
 
 const workout = (date: string): Workout => ({
   id: `${date}-${Math.random()}`,
@@ -48,6 +50,30 @@ describe('updateStreak', () => {
     useStore.setState({ workouts: [workout(daysAgo(0)), workout(daysAgo(0)), workout(daysAgo(1))] });
     useStore.getState().updateStreak();
     expect(useStore.getState().currentStreak).toBe(2);
+  });
+
+  it('survives the spring-forward DST transition', () => {
+    // TZ is pinned to America/New_York in jest.setup.js; DST starts Mar 8 2026.
+    // Verified against the previous implementation: this exact input returned 1
+    // instead of 3, because it stepped back a fixed 86,400,000ms per day and a
+    // local day across the transition is only 23 hours long.
+    jest.useFakeTimers().setSystemTime(new Date(2026, 2, 10, 12, 0, 0));
+    useStore.setState({
+      workouts: [workout('2026-03-10'), workout('2026-03-09'), workout('2026-03-08')],
+    });
+    useStore.getState().updateStreak();
+    expect(useStore.getState().currentStreak).toBe(3);
+    jest.useRealTimers();
+  });
+
+  it('files a workout logged late in the evening under the local day', () => {
+    // 9:30pm local is already tomorrow in UTC, so the old
+    // `toISOString().split('T')[0]` stamped 2026-09-16 here.
+    jest.useFakeTimers().setSystemTime(new Date(2026, 8, 15, 21, 30, 0));
+    useStore.setState({ workouts: [] });
+    useStore.getState().addWorkout(workout(todayISO()));
+    expect(useStore.getState().workouts[0].date).toBe('2026-09-15');
+    jest.useRealTimers();
   });
 });
 

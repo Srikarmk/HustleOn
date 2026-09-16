@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStore } from '../../store';
 import { COLORS, SIZES } from '../../constants/theme';
+import { toISODate } from '../../utils/date';
 
 interface UserInfoScreenProps {
   onComplete: () => void;
@@ -59,7 +60,7 @@ export const UserInfoScreen: React.FC<UserInfoScreenProps> = ({ onComplete }) =>
       setUserProfile({
         name: name.trim(),
         age: calculatedAge.toString(),
-        dateOfBirth: dateOfBirth.toISOString().split('T')[0],
+        dateOfBirth: toISODate(dateOfBirth),
         weight,
         height,
         unit,

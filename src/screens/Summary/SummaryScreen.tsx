@@ -16,6 +16,7 @@ import { useStore } from '../../store';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
 import { generateGeminiResponse, AI_DISCLAIMER } from '../../config/gemini';
 import { useSyncRefresh } from '../../hooks/useSyncRefresh';
+import { parseISODate } from '../../utils/date';
 
 export const SummaryScreen: React.FC = () => {
   const { workouts, meals } = useStore();
@@ -26,20 +27,21 @@ export const SummaryScreen: React.FC = () => {
   const [aiResponse, setAiResponse] = useState('');
   const [isAILoading, setIsAILoading] = useState(false);
 
-  const monthStart = new Date(
-    currentMonth.getFullYear(),
-    currentMonth.getMonth(),
-    1
-  );
   const monthEnd = new Date(
     currentMonth.getFullYear(),
     currentMonth.getMonth() + 1,
     0
   );
 
+  // Compare calendar fields directly. The old range check parsed each date as
+  // UTC midnight, which dropped every workout logged on the 1st of the month
+  // and pulled in the last day of the previous one.
   const monthWorkouts = workouts.filter((w) => {
-    const workoutDate = new Date(w.date);
-    return workoutDate >= monthStart && workoutDate <= monthEnd;
+    const d = parseISODate(w.date);
+    return (
+      d.getFullYear() === currentMonth.getFullYear() &&
+      d.getMonth() === currentMonth.getMonth()
+    );
   });
 
   const totalWorkouts = monthWorkouts.length;
@@ -49,9 +51,10 @@ export const SummaryScreen: React.FC = () => {
   // Calculate best streak
   let bestStreak = 0;
   if (monthWorkouts.length > 0) {
-    const sortedDates = monthWorkouts
-      .map((w) => new Date(w.date).getDate())
-      .sort((a, b) => a - b);
+    // Dedupe first — two workouts on the same day are one streak day.
+    const sortedDates = Array.from(
+      new Set(monthWorkouts.map((w) => parseISODate(w.date).getDate()))
+    ).sort((a, b) => a - b);
     
     let currentStreak = 1;
     for (let i = 1; i < sortedDates.length; i++) {
@@ -84,7 +87,7 @@ export const SummaryScreen: React.FC = () => {
   };
 
   monthWorkouts.forEach((workout) => {
-    const date = new Date(workout.date);
+    const date = parseISODate(workout.date);
     const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
     dayCounts[dayName]++;
   });
@@ -100,7 +103,7 @@ export const SummaryScreen: React.FC = () => {
   const numWeeks = Math.ceil(monthDays / 7);
   const weeklyBreakdown = Array(numWeeks).fill(0) as number[];
   monthWorkouts.forEach((workout) => {
-    const dayOfMonth = new Date(workout.date).getDate();
+    const dayOfMonth = parseISODate(workout.date).getDate();
     const weekIndex = Math.min(numWeeks - 1, Math.floor((dayOfMonth - 1) / 7));
     weeklyBreakdown[weekIndex]++;
   });

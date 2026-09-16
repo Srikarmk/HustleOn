@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, Workout, Meal, BMIRecord, UserProfile, BodyMeasurement, ProgressPhoto, Goal, Integration, NotificationPreference, PrivacySettings, ThemeSettings, Friend, Supplement, RemoteSnapshot } from '../types';
+import { dayNumber, parseISODate } from '../utils/date';
 
 const STORAGE_KEY = '@hustleon:app_data';
 
@@ -215,25 +216,16 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
 
-    const DAY = 1000 * 60 * 60 * 24;
-
-    // Unique workout days (midnight timestamps), most recent first
+    // Unique workout days as local day numbers, most recent first.
+    // dayNumber() is DST-proof; the old fixed-86,400,000ms arithmetic broke
+    // streaks on the two days a year when a local day isn't 24 hours long.
     const uniqueDays = Array.from(
-      new Set(
-        workouts.map((w) => {
-          const d = new Date(w.date);
-          d.setHours(0, 0, 0, 0);
-          return d.getTime();
-        })
-      )
+      new Set(workouts.map((w) => dayNumber(parseISODate(w.date))))
     ).sort((a, b) => b - a);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     // Streak is only "alive" if the most recent workout was today or yesterday.
-    const daysSinceLast = Math.floor((today.getTime() - uniqueDays[0]) / DAY);
-    if (daysSinceLast > 1) {
+    const today = dayNumber(new Date());
+    if (today - uniqueDays[0] > 1) {
       set({ currentStreak: 0 });
       return;
     }
@@ -244,7 +236,7 @@ export const useStore = create<AppState>((set, get) => ({
     for (const day of uniqueDays) {
       if (day === expected) {
         streak++;
-        expected -= DAY;
+        expected -= 1;
       } else {
         break;
       }

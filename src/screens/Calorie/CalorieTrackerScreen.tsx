@@ -24,12 +24,14 @@ import { PressableScale } from '../../components/PressableScale';
 import { AnimatedProgressBar } from '../../components/AnimatedProgressBar';
 import { haptics } from '../../utils/haptics';
 import { useSyncRefresh } from '../../hooks/useSyncRefresh';
+import { useToday } from '../../hooks/useToday';
 
 export const CalorieTrackerScreen: React.FC = () => {
   const { meals, calorieGoal, setCalorieGoal, addMeal, removeMeal } = useStore();
   const navigation = useNavigation<any>();
   const { refreshing, onRefresh } = useSyncRefresh();
-  const [today] = useState(new Date().toISOString().split('T')[0]);
+  // Live value: an app left open across midnight must roll over to the new day.
+  const today = useToday();
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiResponse, setAiResponse] = useState('');
   const [isAILoading, setIsAILoading] = useState(false);
