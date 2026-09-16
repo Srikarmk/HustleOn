@@ -51,7 +51,9 @@ export const CalorieTrackerScreen: React.FC = () => {
     try {
       const response = await generateGeminiResponse(
         prompt,
-        'You are a nutrition expert. Provide helpful, personalized nutrition advice based on the user\'s daily calorie intake. Keep responses in medium-sized paragraphs (3-5 sentences).'
+        'You are a nutrition expert. Provide helpful, personalized nutrition advice based on the user\'s daily calorie intake. Keep responses in medium-sized paragraphs (3-5 sentences).',
+        undefined,
+        { includesUserData: true }
       );
       setAiResponse(response);
     } catch (error) {
@@ -89,10 +91,10 @@ export const CalorieTrackerScreen: React.FC = () => {
               </View>
             </View>
             <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.headerButton} onPress={handleAskAI}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ask AI for nutrition advice" style={styles.headerButton} onPress={handleAskAI}>
                 <Ionicons name="sparkles" size={24} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Notification settings"
                 style={styles.headerButton}
                 onPress={() => navigation.navigate('Profile')}
               >
@@ -179,7 +181,7 @@ export const CalorieTrackerScreen: React.FC = () => {
                     </View>
                     <View style={styles.mealRight}>
                       <Text style={styles.mealCalories}>{meal.calories} cal</Text>
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Delete ${meal.name}`}
                         onPress={() => {
                           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                           removeMeal(meal.id);
@@ -207,7 +209,7 @@ export const CalorieTrackerScreen: React.FC = () => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>AI Nutrition Advice</Text>
-              <TouchableOpacity onPress={() => setShowAIModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close AI advice" onPress={() => setShowAIModal(false)}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
@@ -247,7 +249,7 @@ export const CalorieTrackerScreen: React.FC = () => {
               <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add Food</Text>
-              <TouchableOpacity onPress={() => {
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close add meal" onPress={() => {
                 Keyboard.dismiss();
                 setShowAddMealModal(false);
                 setFoodName('');

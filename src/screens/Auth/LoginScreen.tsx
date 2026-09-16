@@ -108,7 +108,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToSignup }) 
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                 />
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                   onPress={() => setShowPassword(!showPassword)}
                   style={styles.eyeIcon}
                 >

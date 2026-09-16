@@ -140,7 +140,9 @@ export const BMICalculatorScreen: React.FC = () => {
     try {
       const response = await generateGeminiResponse(
         prompt,
-        'You are a health and fitness expert. Provide helpful, personalized advice based on the user\'s BMI. Keep responses in medium-sized paragraphs (3-5 sentences). Always recommend consulting healthcare professionals for medical concerns.'
+        'You are a health and fitness expert. Provide helpful, personalized advice based on the user\'s BMI. Keep responses in medium-sized paragraphs (3-5 sentences). Always recommend consulting healthcare professionals for medical concerns.',
+        undefined,
+        { includesUserData: true }
       );
       setAiResponse(response);
     } catch (error) {
@@ -317,7 +319,7 @@ export const BMICalculatorScreen: React.FC = () => {
                 <Text style={styles.headerSubtitle}>Comprehensive body metrics & progress</Text>
               </View>
             </View>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Notification settings"
               style={styles.headerButton}
               onPress={() => navigation.navigate('Profile')}
             >
@@ -764,7 +766,7 @@ export const BMICalculatorScreen: React.FC = () => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>AI Health Advice</Text>
-              <TouchableOpacity onPress={() => setShowAIModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close AI advice" onPress={() => setShowAIModal(false)}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
@@ -796,7 +798,7 @@ export const BMICalculatorScreen: React.FC = () => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Body Measurements</Text>
-              <TouchableOpacity onPress={() => setShowMeasurementsModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close body measurements" onPress={() => setShowMeasurementsModal(false)}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
@@ -885,7 +887,7 @@ export const BMICalculatorScreen: React.FC = () => {
         onRequestClose={() => setShowPhotoViewer(false)}
       >
         <View style={styles.photoViewerOverlay}>
-          <TouchableOpacity style={styles.photoViewerClose} onPress={() => setShowPhotoViewer(false)}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close photo viewer" style={styles.photoViewerClose} onPress={() => setShowPhotoViewer(false)}>
             <Ionicons name="close" size={30} color="#fff" />
           </TouchableOpacity>
           {progressPhotos.length > 0 && (
@@ -903,7 +905,7 @@ export const BMICalculatorScreen: React.FC = () => {
           )}
           {progressPhotos.length > 1 && (
             <View style={styles.photoViewerControls}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous photo"
                 onPress={() => setSelectedPhotoIndex(Math.max(0, selectedPhotoIndex - 1))}
                 disabled={selectedPhotoIndex === 0}
               >
@@ -916,7 +918,7 @@ export const BMICalculatorScreen: React.FC = () => {
               <Text style={styles.photoViewerCounter}>
                 {selectedPhotoIndex + 1} / {progressPhotos.length}
               </Text>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next photo"
                 onPress={() => setSelectedPhotoIndex(Math.min(progressPhotos.length - 1, selectedPhotoIndex + 1))}
                 disabled={selectedPhotoIndex === progressPhotos.length - 1}
               >

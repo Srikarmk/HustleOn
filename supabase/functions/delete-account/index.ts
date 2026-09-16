@@ -77,11 +77,29 @@ serve(async (req: Request) => {
     });
 
     // 3. Delete the user's storage files (best-effort).
+    // `list` returns at most 100 objects by default, so page until exhausted —
+    // otherwise a user with more than 100 photos keeps files after "delete all
+    // my data", which defeats the point of the endpoint.
     try {
-      const { data: files } = await admin.storage.from(PHOTO_BUCKET).list(userId);
-      if (files && files.length > 0) {
+      const PAGE = 100;
+      for (;;) {
+        const { data: files, error: listError } = await admin.storage
+          .from(PHOTO_BUCKET)
+          .list(userId, { limit: PAGE, offset: 0 });
+        if (listError) {
+          console.error('Storage list failed (continuing):', listError.message);
+          break;
+        }
+        if (!files || files.length === 0) break;
         const paths = files.map((f: any) => `${userId}/${f.name}`);
-        await admin.storage.from(PHOTO_BUCKET).remove(paths);
+        const { error: removeError } = await admin.storage.from(PHOTO_BUCKET).remove(paths);
+        if (removeError) {
+          console.error('Storage remove failed (continuing):', removeError.message);
+          break;
+        }
+        // Always re-list from offset 0: the objects just removed are gone, so
+        // the next page slides down. Stop when a full page no longer comes back.
+        if (files.length < PAGE) break;
       }
     } catch (e) {
       console.error('Storage cleanup failed (continuing):', e);

@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppState } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, Linking } from 'react-native';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store';
+import { appRedirectUri, parseAuthRedirect } from '../lib/links';
+import { captureError } from '../lib/monitoring';
 
 interface SignInResult {
   error: string | null;
@@ -25,6 +26,10 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   deleteAccount: () => Promise<{ error: string | null }>;
+  /** True while the user has arrived via a password-reset link and must set a new password. */
+  passwordRecovery: boolean;
+  updatePassword: (password: string) => Promise<{ error: string | null }>;
+  cancelPasswordRecovery: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -36,6 +41,9 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
   resetPassword: async () => ({ error: 'Auth not ready' }),
   deleteAccount: async () => ({ error: 'Auth not ready' }),
+  passwordRecovery: false,
+  updatePassword: async () => ({ error: 'Auth not ready' }),
+  cancelPasswordRecovery: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -43,6 +51,7 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     // Restore any persisted session on launch.
@@ -52,8 +61,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     // Keep React state in sync with auth events (login, logout, token refresh).
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+    });
+
+    // Handle auth deep links. The reset-password email redirects back into the
+    // app with the recovery session in the URL fragment; without this the link
+    // opened the app and did nothing.
+    const handleUrl = async (url: string | null) => {
+      if (!url) return;
+      const { accessToken, refreshToken, type, error } = parseAuthRedirect(url);
+      if (error) {
+        captureError(new Error(`Auth redirect error: ${error}`), { scope: 'auth-deep-link' });
+        return;
+      }
+      if (!accessToken || !refreshToken) return;
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (sessionError) {
+        captureError(sessionError, { scope: 'auth-deep-link' });
+        return;
+      }
+      if (type === 'recovery') setPasswordRecovery(true);
+    };
+
+    Linking.getInitialURL().then(handleUrl).catch(() => {});
+    const linkListener = Linking.addEventListener('url', ({ url }) => {
+      handleUrl(url).catch(() => {});
     });
 
     // Supabase needs auto-refresh tied to app foreground/background in React Native.
@@ -69,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       authListener.subscription.unsubscribe();
       appStateListener.remove();
+      linkListener.remove();
     };
   }, []);
 
@@ -100,6 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Clear the device-local cache so the next user on this device doesn't
     // inherit the previous user's data (data is already cloud-backed via sync).
     await useStore.getState().clearLocalData();
+    setPasswordRecovery(false);
     await supabase.auth.signOut();
   };
 
@@ -107,19 +146,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data, error } = await supabase.functions.invoke('delete-account', { body: {} });
     if (error) return { error: error.message };
     if (data?.error) return { error: data.error as string };
-    // Wipe local cache + chat history, then sign out.
+    // clearLocalData() also removes the AI chat history.
     await useStore.getState().clearLocalData();
-    try {
-      await AsyncStorage.removeItem('@hustleon:ai_chat');
-    } catch {
-      // best-effort
-    }
     await supabase.auth.signOut();
     return { error: null };
   };
 
+  const updatePassword = async (password: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return { error: error.message };
+    setPasswordRecovery(false);
+    return { error: null };
+  };
+
+  /** Bail out of a reset flow without changing the password. */
+  const cancelPasswordRecovery = async (): Promise<void> => {
+    setPasswordRecovery(false);
+    // The recovery link signed us in; don't leave that session behind.
+    await supabase.auth.signOut();
+  };
+
   const resetPassword = async (email: string): Promise<{ error: string | null }> => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+    // Without an explicit redirect the emailed link lands on Supabase's default
+    // Site URL, which goes nowhere from a native app. `hustleon://` is the scheme
+    // declared in app.config.js.
+    //
+    // Note: the redirect must also be listed under Supabase Auth → URL
+    // Configuration → Redirect URLs, or it is ignored.
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: appRedirectUri('reset-password'),
+    });
     return { error: error?.message ?? null };
   };
 
@@ -134,6 +190,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signOut,
         resetPassword,
         deleteAccount,
+        passwordRecovery,
+        updatePassword,
+        cancelPasswordRecovery,
       }}
     >
       {children}

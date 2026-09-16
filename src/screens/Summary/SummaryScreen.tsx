@@ -134,7 +134,9 @@ export const SummaryScreen: React.FC = () => {
     try {
       const response = await generateGeminiResponse(
         prompt,
-        'You are a fitness coach expert. Provide helpful, personalized insights and recommendations based on the user\'s monthly workout summary. Keep responses in medium-sized paragraphs (3-5 sentences). Be encouraging and provide actionable advice.'
+        'You are a fitness coach expert. Provide helpful, personalized insights and recommendations based on the user\'s monthly workout summary. Keep responses in medium-sized paragraphs (3-5 sentences). Be encouraging and provide actionable advice.',
+        undefined,
+        { includesUserData: true }
       );
       setAiResponse(response);
     } catch (error) {
@@ -164,10 +166,10 @@ export const SummaryScreen: React.FC = () => {
               </View>
             </View>
             <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.headerButton} onPress={handleAskAI}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ask AI for monthly insights" style={styles.headerButton} onPress={handleAskAI}>
                 <Ionicons name="sparkles" size={24} color={COLORS.primary} />
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Notification settings"
                 style={styles.headerButton}
                 onPress={() => navigation.navigate('Profile')}
               >
@@ -178,11 +180,11 @@ export const SummaryScreen: React.FC = () => {
 
           {/* Month Navigation */}
           <View style={styles.monthNav}>
-            <TouchableOpacity onPress={() => changeMonth('prev')}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous month" onPress={() => changeMonth('prev')}>
               <Ionicons name="chevron-back" size={24} color={COLORS.text} />
             </TouchableOpacity>
             <Text style={styles.monthText}>{monthName}</Text>
-            <TouchableOpacity onPress={() => changeMonth('next')}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next month" onPress={() => changeMonth('next')}>
               <Ionicons name="chevron-forward" size={24} color={COLORS.text} />
             </TouchableOpacity>
           </View>
@@ -292,7 +294,7 @@ export const SummaryScreen: React.FC = () => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>AI Fitness Insights</Text>
-              <TouchableOpacity onPress={() => setShowAIModal(false)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close AI insights" onPress={() => setShowAIModal(false)}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>

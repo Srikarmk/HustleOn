@@ -17,6 +17,9 @@ import { StatusBar } from 'expo-status-bar';
 import { COLORS, SIZES } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 
+// Keep in step with ResetPasswordScreen's MIN_PASSWORD_LENGTH.
+const MIN_PASSWORD_LENGTH = 8;
+
 interface SignupScreenProps {
   onNavigateToLogin: () => void;
 }
@@ -32,7 +35,8 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigateToLogin })
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isValid = name && email && password && password === confirmPassword && password.length >= 6;
+  const isValid =
+    name && email && password && password === confirmPassword && password.length >= MIN_PASSWORD_LENGTH;
 
   const handleSignup = async () => {
     if (!isValid || loading) return;
@@ -116,14 +120,14 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigateToLogin })
                 <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Create a password (min 6 characters)"
+                  placeholder={`Create a password (min ${MIN_PASSWORD_LENGTH} characters)`}
                   placeholderTextColor={COLORS.textSecondary}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                 />
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                   onPress={() => setShowPassword(!showPassword)}
                   style={styles.eyeIcon}
                 >
@@ -149,7 +153,7 @@ export const SignupScreen: React.FC<SignupScreenProps> = ({ onNavigateToLogin })
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
                 />
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={showConfirmPassword ? 'Hide confirmed password' : 'Show confirmed password'}
                   onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                   style={styles.eyeIcon}
                 >
