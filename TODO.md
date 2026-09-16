@@ -7,10 +7,93 @@ See [`README.md`](README.md) for setup and [`CLAUDE.md`](CLAUDE.md) for the full
 
 ## ▶️ Next up (recommended sequence)
 
-1. **You:** run the Supabase manual steps below (2 migrations + 2 functions + secret) → unlocks live end-to-end verification.
-2. **You:** host Privacy Policy + Terms pages and update the placeholder URLs in `ProfileScreen.tsx` (Tier-1 App Store blocker).
-3. **You, when Apple enrollment clears:** confirm the bundle id, run `eas init`, fill the Apple IDs in `eas.json`, then `eas build` → `eas submit`. See [`docs/app-store-checklist.md`](docs/app-store-checklist.md).
-4. **You + me:** Phase 1b (Apple + Google sign-in) — needs a Google iOS OAuth client ID from you.
+> **2026-09-15 audit correction.** This file previously implied the app was code-complete and
+> blocked only on accounts/hosting. That was wrong on two counts, both now fixed:
+> the project failed 4 `expo-doctor` checks and could not have produced a working native build,
+> and a systemic UTC-vs-local date bug corrupted streaks, "today", the calendar and every
+> Summary chart. See the new "Tier 0" section below for what was done, and the remaining
+> **Tier 1** list for what still blocks a real release.
+
+1. **Me:** Tier 1 correctness/privacy work — see the list below (onboarding-before-auth data loss,
+   sync pagination, the decorative `cloudSync` / `shareDataWithAI` toggles, AI chat left on the
+   device after sign-out).
+2. **You:** run the Supabase manual steps below (2 migrations + 2 functions + secret).
+3. **You:** host Privacy Policy + Terms pages and update the placeholder URLs in `ProfileScreen.tsx`.
+4. **You, when Apple enrollment clears:** confirm the bundle id, run `eas init`, fill the Apple IDs
+   in `eas.json`, then `eas build` → `eas submit`. See [`docs/app-store-checklist.md`](docs/app-store-checklist.md).
+5. **You + me:** Phase 1b (Apple + Google sign-in) — needs a Google iOS OAuth client ID from you.
+
+---
+
+## ✅ Tier 0 — build blockers (done 2026-09-15)
+
+The app could not have built or run correctly before these. All four `expo-doctor` failures are
+resolved, `tsc --noEmit` is clean, `npm test` is **31/31**, and `expo export` bundles successfully.
+
+> Note: `expo-doctor`'s "packages match versions required by installed Expo SDK" check is
+> intermittent — it fails on roughly one run in three while its own payload reports
+> `{"dependencies":[],"upToDate":true}` (i.e. no mismatches). It depends on a network lookup.
+> `npx expo install --check` is the reliable signal and reports "Dependencies are up to date".
+
+- [x] **Real app icon** — `assets/icon.png` was still the stock Expo placeholder (grey circles).
+      Replaced with a brand mark; SVG sources kept at `assets/icon.svg` / `assets/icon-mark.svg`.
+      Android `adaptiveIcon.backgroundColor` was `#ffffff`, which hid the white foreground.
+- [x] **`expo-notifications` 0.29 → 0.32** (SDK 54 requirement; 0.29 predates the New Architecture).
+      Also migrated the deprecated `shouldShowAlert` handler to `shouldShowBanner`/`shouldShowList`
+      and dropped the `as any` casts hiding trigger types.
+- [x] **Missing peer dep `expo-font`** — `@expo/vector-icons` needs it; without it the app crashes
+      outside Expo Go.
+- [x] **`expo-image-picker` config plugin was never registered** → `NSPhotoLibraryUsageDescription`
+      absent from Info.plist → **iOS killed the app on the first photo pick**. Registered, with
+      unused camera/microphone declarations explicitly disabled. Verified via `expo config --type introspect`.
+- [x] **Duplicate native modules** deduped (`expo-constants`, `react-native-safe-area-context`;
+      the latter needed an `overrides` entry because `react-native-calendars` pins 4.5.0 but never
+      imports it).
+- [x] **`app.json` deleted** — it shadowed `app.config.js` with contradictory values (`light` theme,
+      white splash) and was silently ignored.
+- [x] **Android `package` identifier added** (was absent; Android could not build or submit).
+- [x] Deep-link `scheme: 'hustleon'` added (needed for auth redirects such as password reset).
+
+## ✅ Date/timezone correctness (done 2026-09-15)
+
+- [x] **New `src/utils/date.ts`** — `todayISO` / `toISODate` / `parseISODate` / `dayNumber` /
+      `daysBetween` / `addDays`. All ~35 call sites migrated off `toISOString().split('T')[0]`
+      and bare `new Date(dateString)`.
+- [x] **`updateStreak` rewritten** on DST-proof day numbers (the old fixed-86,400,000ms step
+      returned 1 instead of 3 across spring-forward — verified against the old implementation).
+- [x] **Summary** no longer drops workouts logged on the 1st of the month, no longer attributes
+      them to the wrong weekday, and dedupes same-day workouts in the best-streak count.
+- [x] **`useToday()` hook** — "today" now rolls over at local midnight instead of being frozen at
+      mount, and `workoutsThisWeek` anchors on today rather than the month the calendar is scrolled to.
+- [x] **Date of birth** no longer stored a day early.
+- [x] **Tests**: `TZ` pinned to `America/New_York` in `jest.setup.js`; new `date.test.ts` plus
+      streak regressions (31 tests total, up from 17 — one of which was failing).
+
+---
+
+## 🔴 Tier 1 — still blocking a real release
+
+- [ ] **Onboarding runs before auth → signing into an existing account wipes its cloud data.**
+      Onboarding writes the profile and bumps `dataUpdatedAt`; login then sees local-newer and
+      pushes, and `push()` deletes remote rows not present locally.
+- [ ] **Sync has no pagination** — Supabase caps `select()` at 1000 rows; past ~1000 meals the pull
+      truncates and the next push deletes the remainder server-side.
+- [ ] **`cloudSync` and `shareDataWithAI` toggles do nothing.** `cloudSync` even defaults to *off*
+      while all health data, photos and profile upload regardless. Only `analytics` is enforced.
+- [ ] **AI chat history survives sign-out** (`@hustleon:ai_chat` is cleared only on account delete)
+      — next user on a shared device reads the previous user's health conversation.
+- [ ] **Integrations openly say "placeholder" / "(demo mode)"** in the UI — App Store guideline 2.1.
+      Remove or disable before submitting.
+- [ ] **Password reset is a dead end** — `resetPasswordForEmail` passes no `redirectTo`
+      (the `scheme` is now configured, so this is wireable).
+- [ ] `removeProgressPhoto` never deletes the storage object; `delete-account` lists only the first
+      100 files.
+- [ ] `increment_ai_usage` is `SECURITY DEFINER` with no `REVOKE` — any user can burn another
+      user's daily AI quota.
+- [ ] Zero accessibility labels across ~227 interactive elements.
+- [ ] Android notifications unimplemented (no permission request, no channel).
+
+---
 
 Full ship checklist: [`docs/production-readiness.md`](docs/production-readiness.md).
 

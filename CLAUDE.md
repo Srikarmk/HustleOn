@@ -4,7 +4,7 @@
 
 HustleOn is a React Native fitness tracking app built with Expo. It covers workout logging, calorie tracking, BMI/body tracking, monthly summaries, and an AI coach powered by Google Gemini 2.5 Flash.
 
-**Current state:** Functional dummy app — no real auth backend, AI features require a user-supplied Gemini key, data persisted locally on-device only.
+**Current state:** Real Supabase email/password auth, local-first store with cloud sync, and AI behind a server-side Edge Function proxy. Builds clean (`tsc`, `jest`, `expo export`). **Not yet released** — see [`TODO.md`](TODO.md) Tier 1 for the remaining blockers.
 
 ---
 
@@ -12,7 +12,7 @@ HustleOn is a React Native fitness tracking app built with Expo. It covers worko
 
 | Layer | Library |
 |-------|---------|
-| Framework | React Native `0.81.5` + Expo `~54.0.30` |
+| Framework | React Native `0.81.5` + Expo `~54.0.37` |
 | Language | TypeScript `~5.9.2` |
 | Navigation | `@react-navigation/native` v7, bottom-tabs, native-stack, stack |
 | State | Zustand `^4.5.7` |
@@ -20,7 +20,7 @@ HustleOn is a React Native fitness tracking app built with Expo. It covers worko
 | AI | Google Gemini 2.5 Flash REST API |
 | Calendar | `react-native-calendars` |
 | Media | `expo-image-picker`, `expo-file-system`, `expo-sharing` |
-| UI | `@expo/vector-icons` (Ionicons), `expo-linear-gradient` (installed, unused) |
+| UI | `@expo/vector-icons` (Ionicons) + `expo-font` |
 
 ---
 
@@ -30,8 +30,7 @@ HustleOn is a React Native fitness tracking app built with Expo. It covers worko
 /
 ├── App.tsx                        # Root — navigation phase controller
 ├── index.ts                       # Expo entry point
-├── app.config.js                  # Expo config, loads .env, injects GEMINI_API_KEY
-├── app.json
+├── app.config.js                  # Expo config (single source of truth; app.json was removed)
 ├── babel.config.js
 ├── tsconfig.json
 ├── env.example                    # Copy to .env, add GEMINI_API_KEY
@@ -217,16 +216,16 @@ Fixed: real **Supabase** email/password auth. `src/lib/supabase.ts` is the clien
 # 1. Install dependencies
 npm install
 
-# 2. Create .env with your Gemini key
+# 2. (optional) .env for Supabase/Sentry overrides — NOT the Gemini key,
+#    which lives as a Supabase Edge Function secret.
 cp env.example .env
-# Edit .env: GEMINI_API_KEY=AIza...
 
 # 3. Start Expo dev server
 npm start
 # or: npm run ios / npm run android
 ```
 
-The `.env` file is read by `app.config.js` at startup and injected into `Constants.expoConfig.extra.geminiApiKey`. Without it, AI features return an error message instead of crashing.
+`app.config.js` reads `.env` for optional `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SENTRY_DSN` overrides. The Gemini key is a server-side secret on the `gemini-proxy` Edge Function and never ships in the bundle.
 
 ---
 
@@ -241,5 +240,15 @@ The `.env` file is read by `app.config.js` at startup and injected into `Constan
 **Cloud sync (Phase 2)**: The local store stays the source of truth; `src/lib/sync.ts` mirrors it to Supabase. A single `dataUpdatedAt` clock (in the store, bumped by `saveData()`, mirrored to `profiles.data_updated_at`) drives **whole-account last-write-wins**: remote-newer → pull, local-newer → push (full reconcile: upsert local rows + delete remote rows not present locally). `syncNow()` runs on launch (after `loadData()`), on app foreground, and debounced after local mutations (via `scheduleSync()`, triggered by an `App.tsx` store subscription). Per-type tables: `workouts/meals/bmi_records/body_measurements/goals/friends/supplements/progress_photos` each `(user_id, id, data jsonb, updated_at)`; `profiles` holds the user profile + scalar settings as `data jsonb` + the clock. Progress photos + profile pictures upload to the `progress-photos` Storage bucket (local `file://` URIs replaced with public URLs before push). RLS scopes every row/object to `auth.uid()`. Schema lives in `supabase/migrations/0001_init.sql` (run manually in the Supabase SQL editor). **Caveat:** account-level LWW, not per-row CRDT — last device to sync wins the whole account if two edit while offline.
 
 **Motion & haptics**: reusable primitives in `src/components/` — `FadeInView` (fade+rise entrance), `PressableScale` (spring press + light haptic), `AnimatedProgressBar` (eased fill) — plus `src/utils/haptics.ts` (crash-proof `expo-haptics` wrapper: light/medium/success/selection). All use the built-in `Animated` API (New-Arch safe, no extra native deps). Conventions: success haptic only when something is actually logged; selection haptic for toggles/tab switches; `LayoutAnimation.configureNext` before list add/remove; pull-to-refresh on the three data tabs runs `syncNow()` via `src/hooks/useSyncRefresh.ts`. Keep motion communicative, not decorative — Summary/Profile/Chat stay calm.
+
+**Dates — always use `src/utils/date.ts`**: every stored date (`workout.date`, `meal.date`,
+`goal.targetDate`, `profile.dateOfBirth`, …) is a `YYYY-MM-DD` string meaning a day on the
+**user's local calendar**. Never use `new Date().toISOString().split('T')[0]` (that is the *UTC*
+day — it stamped tomorrow's date for evening logs west of UTC) and never `new Date(dateString)`
+on a date-only value (that parses as *UTC midnight*, reading back a day early). Use `todayISO()`,
+`toISODate(d)`, `parseISODate(s)`, and for day arithmetic `dayNumber` / `daysBetween` / `addDays`,
+which are DST-proof. Screens that display "today" should use the `useToday()` hook so the day rolls
+over at local midnight while the app is open. Tests pin `TZ=America/New_York` (`jest.setup.js`) so
+this bug class is actually exercised; see `src/utils/__tests__/date.test.ts`.
 
 **Error reporting**: route caught errors through `captureError(err, { scope })` from `src/lib/monitoring.ts` (not bare `console.error`) — it lazy-loads Sentry when `SENTRY_DSN` is configured and respects the Analytics opt-out.
