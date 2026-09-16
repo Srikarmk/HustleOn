@@ -2,8 +2,59 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, Workout, Meal, BMIRecord, UserProfile, BodyMeasurement, ProgressPhoto, Goal, Integration, NotificationPreference, PrivacySettings, ThemeSettings, Friend, Supplement, RemoteSnapshot } from '../types';
 import { dayNumber, parseISODate } from '../utils/date';
+import { captureError } from '../lib/monitoring';
 
 const STORAGE_KEY = '@hustleon:app_data';
+
+/**
+ * Privacy-settings migration.
+ *
+ * `cloudSync` shipped defaulting to `false` while `sync.ts` ignored it entirely,
+ * so every persisted `false` is a dead default rather than a user choice — and
+ * those users' data *is* already in the cloud. Now that the flag is enforced,
+ * adopting the stored value verbatim would silently switch off backup for them.
+ * Bump them to the new default once, then respect the value from then on.
+ */
+const PRIVACY_SETTINGS_VERSION = 1;
+
+const DEFAULT_PRIVACY: PrivacySettings = {
+  cloudSync: true,
+  analytics: true,
+  shareDataWithAI: true,
+};
+
+function migratePrivacySettings(stored: any): PrivacySettings {
+  if (!stored) return { ...DEFAULT_PRIVACY };
+  const { aiDataUsage, ...rest } = stored; // aiDataUsage was never used or shown
+  if (stored.version === PRIVACY_SETTINGS_VERSION) {
+    return { ...DEFAULT_PRIVACY, ...rest };
+  }
+  return { ...DEFAULT_PRIVACY, ...rest, cloudSync: true };
+}
+
+export const AI_CHAT_KEY = '@hustleon:ai_chat';
+
+const DEFAULT_INTEGRATIONS: Integration[] = [
+  { id: 'fitbit', name: 'fitbit', connected: false },
+  { id: 'apple_health', name: 'apple_health', connected: false },
+  { id: 'google_fit', name: 'google_fit', connected: false },
+  { id: 'strava', name: 'strava', connected: false },
+  { id: 'myfitnesspal', name: 'myfitnesspal', connected: false },
+];
+
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreference[] = [
+  { type: 'workout_reminder', enabled: true, time: '18:00', days: ['Mon', 'Wed', 'Fri'] },
+  { type: 'meal_reminder', enabled: true, time: '12:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] },
+  { type: 'goal_milestone', enabled: true },
+  { type: 'streak_reminder', enabled: true, time: '20:00' },
+  { type: 'weekly_summary', enabled: true },
+];
+
+const DEFAULT_THEME: ThemeSettings = {
+  darkMode: true,
+  accentColor: '#7864b4',
+  layout: 'comfortable',
+};
 
 const DEFAULT_SUPPLEMENTS: Supplement[] = [
   { id: 'sup-1', name: 'Vitamin D', takenDates: [] },
@@ -19,31 +70,10 @@ export const useStore = create<AppState>((set, get) => ({
   bodyMeasurements: [],
   progressPhotos: [],
   goals: [],
-  integrations: [
-    { id: 'fitbit', name: 'fitbit', connected: false },
-    { id: 'apple_health', name: 'apple_health', connected: false },
-    { id: 'google_fit', name: 'google_fit', connected: false },
-    { id: 'strava', name: 'strava', connected: false },
-    { id: 'myfitnesspal', name: 'myfitnesspal', connected: false },
-  ],
-  notificationPreferences: [
-    { type: 'workout_reminder', enabled: true, time: '18:00', days: ['Mon', 'Wed', 'Fri'] },
-    { type: 'meal_reminder', enabled: true, time: '12:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] },
-    { type: 'goal_milestone', enabled: true },
-    { type: 'streak_reminder', enabled: true, time: '20:00' },
-    { type: 'weekly_summary', enabled: true },
-  ],
-  privacySettings: {
-    aiDataUsage: true,
-    cloudSync: false,
-    analytics: true,
-    shareDataWithAI: true,
-  },
-  themeSettings: {
-    darkMode: true,
-    accentColor: '#7864b4',
-    layout: 'comfortable',
-  },
+  integrations: [...DEFAULT_INTEGRATIONS],
+  notificationPreferences: [...DEFAULT_NOTIFICATION_PREFERENCES],
+  privacySettings: { ...DEFAULT_PRIVACY },
+  themeSettings: { ...DEFAULT_THEME },
   friends: [],
   supplements: [],
   weeklyGoal: 3,
@@ -254,36 +284,15 @@ export const useStore = create<AppState>((set, get) => ({
           userProfile: parsed.userProfile || null,
           workouts: parsed.workouts || [],
           meals: parsed.meals || [],
-          supplements: parsed.supplements?.length ? parsed.supplements : DEFAULT_SUPPLEMENTS,
+          supplements: parsed.supplements?.length ? parsed.supplements : [...DEFAULT_SUPPLEMENTS],
           bmiRecords: parsed.bmiRecords || [],
           bodyMeasurements: parsed.bodyMeasurements || [],
           progressPhotos: parsed.progressPhotos || [],
           goals: parsed.goals || [],
-          integrations: parsed.integrations || [
-            { id: 'fitbit', name: 'fitbit', connected: false },
-            { id: 'apple_health', name: 'apple_health', connected: false },
-            { id: 'google_fit', name: 'google_fit', connected: false },
-            { id: 'strava', name: 'strava', connected: false },
-            { id: 'myfitnesspal', name: 'myfitnesspal', connected: false },
-          ],
-          notificationPreferences: parsed.notificationPreferences || [
-            { type: 'workout_reminder', enabled: true, time: '18:00', days: ['Mon', 'Wed', 'Fri'] },
-            { type: 'meal_reminder', enabled: true, time: '12:00', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] },
-            { type: 'goal_milestone', enabled: true },
-            { type: 'streak_reminder', enabled: true, time: '20:00' },
-            { type: 'weekly_summary', enabled: true },
-          ],
-          privacySettings: parsed.privacySettings || {
-            aiDataUsage: true,
-            cloudSync: false,
-            analytics: true,
-            shareDataWithAI: true,
-          },
-          themeSettings: parsed.themeSettings || {
-            darkMode: true,
-            accentColor: '#7864b4',
-            layout: 'comfortable',
-          },
+          integrations: parsed.integrations || [...DEFAULT_INTEGRATIONS],
+          notificationPreferences: parsed.notificationPreferences || [...DEFAULT_NOTIFICATION_PREFERENCES],
+          privacySettings: migratePrivacySettings(parsed.privacySettings),
+          themeSettings: parsed.themeSettings || { ...DEFAULT_THEME },
           friends: parsed.friends || [],
           weeklyGoal: parsed.weeklyGoal || 3,
           calorieGoal: parsed.calorieGoal || 2000,
@@ -292,7 +301,7 @@ export const useStore = create<AppState>((set, get) => ({
         get().updateStreak();
       }
     } catch (error) {
-      console.error('Failed to load data:', error);
+      captureError(error, { scope: 'store.loadData' });
     }
   },
 
@@ -313,7 +322,7 @@ export const useStore = create<AppState>((set, get) => ({
         goals: state.goals,
         integrations: state.integrations,
         notificationPreferences: state.notificationPreferences,
-        privacySettings: state.privacySettings,
+        privacySettings: { ...state.privacySettings, version: PRIVACY_SETTINGS_VERSION },
         themeSettings: state.themeSettings,
         friends: state.friends,
         supplements: state.supplements,
@@ -323,7 +332,7 @@ export const useStore = create<AppState>((set, get) => ({
       };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
     } catch (error) {
-      console.error('Failed to save data:', error);
+      captureError(error, { scope: 'store.saveData' });
     }
   },
 
@@ -361,7 +370,7 @@ export const useStore = create<AppState>((set, get) => ({
         goals: state.goals,
         integrations: state.integrations,
         notificationPreferences: state.notificationPreferences,
-        privacySettings: state.privacySettings,
+        privacySettings: { ...state.privacySettings, version: PRIVACY_SETTINGS_VERSION },
         themeSettings: state.themeSettings,
         friends: state.friends,
         supplements: state.supplements,
@@ -371,7 +380,7 @@ export const useStore = create<AppState>((set, get) => ({
       };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
     } catch (error) {
-      console.error('Failed to persist remote state:', error);
+      captureError(error, { scope: 'store.applyRemoteState' });
     }
   },
 
@@ -387,24 +396,28 @@ export const useStore = create<AppState>((set, get) => ({
       bodyMeasurements: [],
       progressPhotos: [],
       goals: [],
-      integrations: [
-        { id: 'fitbit', name: 'fitbit', connected: false },
-        { id: 'apple_health', name: 'apple_health', connected: false },
-        { id: 'google_fit', name: 'google_fit', connected: false },
-        { id: 'strava', name: 'strava', connected: false },
-        { id: 'myfitnesspal', name: 'myfitnesspal', connected: false },
-      ],
+      integrations: [...DEFAULT_INTEGRATIONS],
       friends: [],
-      supplements: DEFAULT_SUPPLEMENTS,
+      supplements: [...DEFAULT_SUPPLEMENTS],
       weeklyGoal: 3,
       calorieGoal: 2000,
       currentStreak: 0,
       dataUpdatedAt: '1970-01-01T00:00:00.000Z',
+      // Settings are per-user too — these used to survive a sign-out and carry
+      // one user's notification schedule and privacy choices to the next.
+      notificationPreferences: [...DEFAULT_NOTIFICATION_PREFERENCES],
+      privacySettings: { ...DEFAULT_PRIVACY },
+      themeSettings: { ...DEFAULT_THEME },
+      syncStatus: 'idle',
+      lastSyncedAt: null,
     });
     try {
-      await AsyncStorage.removeItem(STORAGE_KEY);
+      // AI_CHAT_KEY holds the coach conversation, which contains health details.
+      // It was previously only removed on account deletion, so the next user on
+      // a shared device could read the previous user's chat.
+      await AsyncStorage.multiRemove([STORAGE_KEY, AI_CHAT_KEY]);
     } catch (error) {
-      console.error('Failed to clear local data:', error);
+      captureError(error, { scope: 'store.clearLocalData' });
     }
   },
 }));

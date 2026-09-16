@@ -6,8 +6,9 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import NetInfo from '@react-native-community/netinfo';
-import { OnboardingNavigator } from './src/navigation/OnboardingNavigator';
+import { IntroNavigator, ProfileSetupNavigator } from './src/navigation/OnboardingNavigator';
 import { AuthNavigator } from './src/navigation/AuthNavigator';
+import { ResetPasswordScreen } from './src/screens/Auth/ResetPasswordScreen';
 import { MainNavigatorWithStack } from './src/navigation/MainNavigator';
 import { storage } from './src/utils/storage';
 import {
@@ -19,7 +20,7 @@ import {
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { useStore } from './src/store';
 import { syncNow, scheduleSync } from './src/lib/sync';
-import { initMonitoring } from './src/lib/monitoring';
+import { initMonitoring, captureError } from './src/lib/monitoring';
 import { COLORS } from './src/constants/theme';
 
 // Initialize crash reporting as early as possible (no-op until a DSN is set).
@@ -37,42 +38,67 @@ Notifications.setNotificationHandler({
 });
 
 const AppContent: React.FC = () => {
-  const { session, loading: authLoading } = useAuth();
-  const isAuthenticated = !!session;
+  const { session, loading: authLoading, passwordRecovery } = useAuth();
+  const userId = session?.user?.id ?? null;
+  const isAuthenticated = !!userId;
 
-  const [onboardingChecked, setOnboardingChecked] = useState(false);
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [introChecked, setIntroChecked] = useState(false);
+  const [introSeen, setIntroSeen] = useState(false);
+  // Null until this user's data has been loaded + synced and we know whether
+  // they still need profile setup.
+  const [profileSetupDone, setProfileSetupDone] = useState<boolean | null>(null);
 
   const { loadData, currentStreak } = useStore();
 
-  // Read the onboarding flag once at launch (auth comes from Supabase session).
+  // Read the device-global intro flag once at launch (migrating the old key).
   useEffect(() => {
     storage
-      .getOnboardingCompleted()
-      .then(setHasCompletedOnboarding)
-      .catch((error) => console.error('Error reading onboarding status:', error))
-      .finally(() => setOnboardingChecked(true));
+      .migrateLegacyOnboardingFlag()
+      .then(() => storage.getIntroSeen())
+      .then(setIntroSeen)
+      .catch((error) => captureError(error, { scope: 'intro-flag' }))
+      .finally(() => setIntroChecked(true));
   }, []);
 
-  // When authenticated + onboarded: load local data, sync with the cloud,
-  // then (re)schedule notifications from the (possibly pulled) preferences.
+  // Per-user bootstrap. Load local data and sync BEFORE deciding whether profile
+  // setup is needed, so an existing user on a new device doesn't re-onboard (and
+  // doesn't overwrite their cloud profile with a blank one).
   useEffect(() => {
-    if (isAuthenticated && hasCompletedOnboarding) {
-      (async () => {
-        await loadData();
-        await syncNow();
-        await requestNotificationPermissions();
-        const s = useStore.getState();
-        await scheduleAllNotifications(s.notificationPreferences, s.currentStreak);
-      })().catch(console.error);
+    if (!userId) {
+      setProfileSetupDone(null);
+      return;
     }
-  }, [isAuthenticated, hasCompletedOnboarding]);
+    let cancelled = false;
+    (async () => {
+      await loadData();
+      await syncNow();
+
+      const flagged = await storage.getProfileSetupCompleted(userId);
+      // A profile in the store (local or just pulled) means this user has been
+      // through setup before — covers reinstalls and pre-split installs.
+      const done = flagged || !!useStore.getState().userProfile;
+      if (done && !flagged) await storage.setProfileSetupCompleted(userId, true);
+      if (cancelled) return;
+      setProfileSetupDone(done);
+
+      await requestNotificationPermissions();
+      const s = useStore.getState();
+      await scheduleAllNotifications(s.notificationPreferences, s.currentStreak);
+    })().catch((error) => {
+      captureError(error, { scope: 'bootstrap' });
+      // Don't trap the user on a spinner if bootstrap fails.
+      if (!cancelled) setProfileSetupDone(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   // Sync on app foreground.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active' && isAuthenticated) {
-        syncNow().catch(console.error);
+        syncNow().catch((error) => captureError(error, { scope: 'sync.trigger' }));
       }
     });
     return () => sub.remove();
@@ -83,7 +109,7 @@ const AppContent: React.FC = () => {
     if (!isAuthenticated) return;
     const unsub = NetInfo.addEventListener((state) => {
       if (state.isConnected) {
-        syncNow().catch(console.error);
+        syncNow().catch((error) => captureError(error, { scope: 'sync.trigger' }));
       }
     });
     return unsub;
@@ -104,46 +130,61 @@ const AppContent: React.FC = () => {
 
   // Clear scheduled notifications + badge when the user signs out.
   useEffect(() => {
-    if (onboardingChecked && !isAuthenticated) {
-      cancelAllNotifications().catch(console.error);
+    if (introChecked && !isAuthenticated) {
+      cancelAllNotifications().catch((error) => captureError(error, { scope: 'notifications.cancel' }));
     }
-  }, [isAuthenticated, onboardingChecked]);
+  }, [isAuthenticated, introChecked]);
 
   // Keep badge in sync with current streak.
   useEffect(() => {
     if (isAuthenticated) {
-      updateBadgeCount(currentStreak).catch(console.error);
+      updateBadgeCount(currentStreak).catch((error) => captureError(error, { scope: 'notifications.badge' }));
     }
   }, [currentStreak, isAuthenticated]);
 
-  const handleOnboardingComplete = async () => {
-    try {
-      await storage.setOnboardingCompleted(true);
-      setHasCompletedOnboarding(true);
-    } catch (error) {
-      console.error('Error saving onboarding status:', error);
-    }
+  const handleIntroComplete = async () => {
+    await storage.setIntroSeen(true).catch(() => {});
+    setIntroSeen(true);
   };
 
-  if (authLoading || !onboardingChecked) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <StatusBar style="light" />
-      </View>
-    );
+  const handleProfileSetupComplete = async () => {
+    if (userId) await storage.setProfileSetupCompleted(userId, true);
+    setProfileSetupDone(true);
+  };
+
+  const spinner = (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color={COLORS.primary} />
+      <StatusBar style="light" />
+    </View>
+  );
+
+  if (authLoading || !introChecked) return spinner;
+
+  // Phase order: password recovery → intro (marketing) → auth → profile setup
+  // (writes data) → app. Recovery wins: the emailed link signs the user in with
+  // a recovery session, so without this they'd land straight in the app with no
+  // way to actually set a new password.
+  let content: React.ReactNode;
+  if (passwordRecovery) {
+    content = <ResetPasswordScreen />;
+  } else if (!introSeen) {
+    content = <IntroNavigator onComplete={handleIntroComplete} />;
+  } else if (!isAuthenticated) {
+    content = <AuthNavigator />;
+  } else if (profileSetupDone === null) {
+    // Signed in, but still loading/syncing this user's data.
+    return spinner;
+  } else if (!profileSetupDone) {
+    content = <ProfileSetupNavigator onComplete={handleProfileSetupComplete} />;
+  } else {
+    content = <MainNavigatorWithStack />;
   }
 
   return (
     <NavigationContainer>
       <StatusBar style="light" />
-      {!hasCompletedOnboarding ? (
-        <OnboardingNavigator onComplete={handleOnboardingComplete} />
-      ) : !isAuthenticated ? (
-        <AuthNavigator />
-      ) : (
-        <MainNavigatorWithStack />
-      )}
+      {content}
     </NavigationContainer>
   );
 };

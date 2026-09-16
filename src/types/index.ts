@@ -93,9 +93,11 @@ export interface NotificationPreference {
 }
 
 export interface PrivacySettings {
-  aiDataUsage: boolean;
+  /** Mirror the local store to Supabase. Enforced in `src/lib/sync.ts`. */
   cloudSync: boolean;
+  /** Send crash/error reports. Enforced in `src/lib/monitoring.ts`. */
   analytics: boolean;
+  /** Include the user's logged data in AI prompts. Enforced in `src/config/gemini.ts`. */
   shareDataWithAI: boolean;
 }
 
@@ -139,7 +141,7 @@ export interface AppState {
   // Whole-account last-write-wins sync clock (ISO timestamp).
   dataUpdatedAt: string;
   // Transient sync UI state (not persisted, not synced).
-  syncStatus: 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
+  syncStatus: 'idle' | 'syncing' | 'synced' | 'error' | 'offline' | 'disabled';
   lastSyncedAt: string | null;
   setSyncState: (status: AppState['syncStatus'], lastSyncedAt?: string | null) => void;
   setUserProfile: (profile: UserProfile) => void;

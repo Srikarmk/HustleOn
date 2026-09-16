@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '../index';
 import { addDays, toISODate, todayISO } from '../../utils/date';
 import type { Workout, Meal, Goal, RemoteSnapshot } from '../../types';
@@ -182,5 +183,81 @@ describe('applyRemoteState', () => {
     expect(state.calorieGoal).toBe(2500);
     // The clock reflects the remote timestamp exactly — a pull must not bump it.
     expect(state.dataUpdatedAt).toBe(remoteTs);
+  });
+});
+
+describe('privacy settings migration', () => {
+  it('re-enables cloudSync once for data persisted before the flag was enforced', async () => {
+    // The old default was `false` while sync.ts ignored it, so those users' data
+    // is already in the cloud — adopting `false` verbatim would silently stop
+    // backing them up. No `version` marker = pre-enforcement payload.
+    await AsyncStorage.setItem(
+      '@hustleon:app_data',
+      JSON.stringify({
+        privacySettings: { aiDataUsage: true, cloudSync: false, analytics: false, shareDataWithAI: false },
+      })
+    );
+
+    await useStore.getState().loadData();
+    const privacy = useStore.getState().privacySettings as any;
+
+    expect(privacy.cloudSync).toBe(true);
+    // Choices the user could actually make are preserved.
+    expect(privacy.analytics).toBe(false);
+    expect(privacy.shareDataWithAI).toBe(false);
+    // The dead field is dropped.
+    expect(privacy.aiDataUsage).toBeUndefined();
+  });
+
+  it('respects cloudSync: false once the settings carry the version marker', async () => {
+    await AsyncStorage.setItem(
+      '@hustleon:app_data',
+      JSON.stringify({
+        privacySettings: { version: 1, cloudSync: false, analytics: true, shareDataWithAI: true },
+      })
+    );
+
+    await useStore.getState().loadData();
+    expect(useStore.getState().privacySettings.cloudSync).toBe(false);
+  });
+
+  it('writes the version marker so the migration only runs once', async () => {
+    useStore.getState().updatePrivacySettings({ cloudSync: false });
+    const raw = await AsyncStorage.getItem('@hustleon:app_data');
+    expect(JSON.parse(raw!).privacySettings.version).toBe(1);
+
+    // A second load must now honour the stored value rather than re-migrating.
+    await useStore.getState().loadData();
+    expect(useStore.getState().privacySettings.cloudSync).toBe(false);
+  });
+});
+
+describe('clearLocalData (sign-out hygiene)', () => {
+  const AI_CHAT_KEY = '@hustleon:ai_chat';
+
+  it('resets per-user settings and removes the AI chat history', async () => {
+    await AsyncStorage.setItem(AI_CHAT_KEY, JSON.stringify([{ id: '1', text: 'my weight is 80kg' }]));
+    useStore.setState({
+      privacySettings: { cloudSync: false, analytics: false, shareDataWithAI: false },
+      themeSettings: { darkMode: false, accentColor: '#ff0000', layout: 'compact' },
+      notificationPreferences: [{ type: 'workout_reminder', enabled: false, time: '05:00' }],
+      lastSyncedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    await useStore.getState().clearLocalData();
+    const state = useStore.getState();
+
+    // Settings must not carry over to the next user on a shared device.
+    expect(state.privacySettings).toEqual({
+      cloudSync: true,
+      analytics: true,
+      shareDataWithAI: true,
+    });
+    expect(state.themeSettings.darkMode).toBe(true);
+    expect(state.notificationPreferences.length).toBeGreaterThan(1);
+    expect(state.lastSyncedAt).toBeNull();
+
+    // The coach conversation contains health details — it must go too.
+    expect(await AsyncStorage.getItem(AI_CHAT_KEY)).toBeNull();
   });
 });
