@@ -81,26 +81,32 @@ HustleOn is a React Native fitness tracking app built with Expo. It covers worko
 
 ```
 App launch
-  └─ checkAppStatus() reads AsyncStorage
-       ├─ !onboardingCompleted → OnboardingNavigator
-       │     Welcome → Features → UserInfo → GetStarted → sets onboardingCompleted=true
-       ├─ !isAuthenticated → AuthNavigator
-       │     Login ↔ Signup → sets isAuthenticated=true
+  └─ AuthProvider restores the Supabase session; App.tsx picks a phase:
+       ├─ passwordRecovery      → ResetPasswordScreen   (arrived via a reset email link)
+       ├─ !introSeen            → IntroNavigator        (Welcome → Features; writes nothing)
+       ├─ no session            → AuthNavigator         (Login ↔ Signup)
+       ├─ loading/syncing       → spinner
+       ├─ !profileSetupDone     → ProfileSetupNavigator (UserInfo → GetStarted; writes profile)
        └─ MainNavigatorWithStack
-             MainTabs (bottom nav)
-               Tracker | Calories | BMI | Summary | Profile
-             + AIChat (modal, triggered by FloatingAIButton on every tab)
+             MainTabs: Tracker | Calories | BMI | Summary | Profile
+             + AIChat (modal, via FloatingAIButton on every tab)
 ```
 
+**Onboarding deliberately straddles authentication.** The marketing screens run before
+sign-in; the profile-writing screens run *after*. They used to all run before, which bumped
+the store's `dataUpdatedAt` while signed out — so logging into an existing account looked
+"local newer" to last-write-wins sync and `push()` deleted every remote row, wiping the
+account's cloud data on any reinstall-then-login. `App.tsx` also awaits `loadData()` +
+`syncNow()` *before* deciding whether profile setup is needed, so an existing user on a new
+device never re-onboards.
+
 Storage layers:
-- **Auth/session** → Supabase (`src/lib/supabase.ts`), session persisted in AsyncStorage by supabase-js
-- `src/utils/storage.ts` — onboarding flag only (`@hustleon:onboarding_completed`)
+- **Auth/session** → Supabase (`src/lib/supabase.ts`), persisted in AsyncStorage by supabase-js
+- `src/utils/storage.ts` — onboarding flags only: `intro` is device-global, `profileSetup` is
+  **per user** (it was one global key, so a second account on a device skipped setup entirely)
 - `src/store/index.ts` — all fitness data (`@hustleon:app_data`), the local source of truth
-- **Cloud sync** → Supabase Postgres + Storage (`src/lib/sync.ts`); local store mirrors to per-type tables, whole-account last-write-wins
-
-Navigation phase in `App.tsx`: `OnboardingNavigator` (if not onboarded) → `AuthNavigator` (if no Supabase session) → `MainNavigatorWithStack`.
-
----
+- `@hustleon:ai_chat` — AI coach conversation; cleared by `clearLocalData()` on sign-out
+- **Cloud sync** → Supabase Postgres + Storage (`src/lib/sync.ts`)
 
 ## Data Model (src/types/index.ts)
 
@@ -116,7 +122,7 @@ Navigation phase in `App.tsx`: `OnboardingNavigator` (if not onboarded) → `Aut
 | `Goal` | id, type, title, targetValue, currentValue, unit, targetDate |
 | `Integration` | id, name (fitbit/apple_health/google_fit/strava/myfitnesspal), connected, lastSync |
 | `NotificationPreference` | type, enabled, time, days |
-| `PrivacySettings` | aiDataUsage, cloudSync, analytics, shareDataWithAI |
+| `PrivacySettings` | cloudSync, analytics, shareDataWithAI (all three enforced; `version` marks the migration) |
 | `ThemeSettings` | darkMode, accentColor, layout |
 | `Friend` | id, name, avatar, connectedAt |
 
@@ -237,7 +243,11 @@ npm start
 
 **Gemini calls**: `generateGeminiResponse(prompt, systemPrompt?, history?)` posts to the `gemini-proxy` Edge Function. The function builds Gemini `contents` from the optional `history` (`{role:'user'|'model', text}[]`) plus the current user turn, and sets `systemInstruction` from `systemPrompt`. `AIChatScreen` passes its prior messages (capped to the last 20) so the coach is **multi-turn / conversational**; the per-screen advice calls (Calorie/BMI/Summary) omit `history` and stay single-turn.
 
-**Cloud sync (Phase 2)**: The local store stays the source of truth; `src/lib/sync.ts` mirrors it to Supabase. A single `dataUpdatedAt` clock (in the store, bumped by `saveData()`, mirrored to `profiles.data_updated_at`) drives **whole-account last-write-wins**: remote-newer → pull, local-newer → push (full reconcile: upsert local rows + delete remote rows not present locally). `syncNow()` runs on launch (after `loadData()`), on app foreground, and debounced after local mutations (via `scheduleSync()`, triggered by an `App.tsx` store subscription). Per-type tables: `workouts/meals/bmi_records/body_measurements/goals/friends/supplements/progress_photos` each `(user_id, id, data jsonb, updated_at)`; `profiles` holds the user profile + scalar settings as `data jsonb` + the clock. Progress photos + profile pictures upload to the `progress-photos` Storage bucket (local `file://` URIs replaced with public URLs before push). RLS scopes every row/object to `auth.uid()`. Schema lives in `supabase/migrations/0001_init.sql` (run manually in the Supabase SQL editor). **Caveat:** account-level LWW, not per-row CRDT — last device to sync wins the whole account if two edit while offline.
+Pass `{ includesUserData: true }` for any prompt that embeds the user's logged data (weight, BMI, meals, workout history) — that gates the call on the `shareDataWithAI` privacy toggle and returns `AI_DATA_SHARING_DISABLED` instead of calling out. The AI chat and the food lookup deliberately omit it: the user types those themselves.
+
+**Cloud sync (Phase 2)**: The local store stays the source of truth; `src/lib/sync.ts` mirrors it to Supabase. A single `dataUpdatedAt` clock (in the store, bumped by `saveData()`, mirrored to `profiles.data_updated_at`) drives **whole-account last-write-wins**: remote-newer → pull, local-newer → push (full reconcile: upsert local rows + delete remote rows not present locally). `syncNow()` runs on launch (after `loadData()`), on app foreground, and debounced after local mutations (via `scheduleSync()`, triggered by an `App.tsx` store subscription). Per-type tables: `workouts/meals/bmi_records/body_measurements/goals/friends/supplements/progress_photos` each `(user_id, id, data jsonb, updated_at)`; `profiles` holds the user profile + scalar settings as `data jsonb` + the clock. Progress photos + profile pictures upload to the `progress-photos` Storage bucket (local `file://` URIs replaced with public URLs before push). RLS scopes every row/object to `auth.uid()`. Schema lives in `supabase/migrations/0001_init.sql` (run manually in the Supabase SQL editor). `syncNow()` returns early with status `disabled` when `privacySettings.cloudSync` is off — the toggle is authoritative. Every whole-collection read **must** page (`selectAllRows`, `PAGE_SIZE = 1000`): PostgREST caps responses, and a truncated read previously made the push delete every row it never saw. Upserts/deletes are chunked. `reconcilePhotoStorage()` runs after each push and deletes bucket objects no longer referenced, so photos deleted offline are cleaned up too.
+
+**Caveat:** account-level LWW, not per-row CRDT — last device to sync wins the whole account if two edit while offline.
 
 **Motion & haptics**: reusable primitives in `src/components/` — `FadeInView` (fade+rise entrance), `PressableScale` (spring press + light haptic), `AnimatedProgressBar` (eased fill) — plus `src/utils/haptics.ts` (crash-proof `expo-haptics` wrapper: light/medium/success/selection). All use the built-in `Animated` API (New-Arch safe, no extra native deps). Conventions: success haptic only when something is actually logged; selection haptic for toggles/tab switches; `LayoutAnimation.configureNext` before list add/remove; pull-to-refresh on the three data tabs runs `syncNow()` via `src/hooks/useSyncRefresh.ts`. Keep motion communicative, not decorative — Summary/Profile/Chat stay calm.
 
@@ -250,5 +260,9 @@ on a date-only value (that parses as *UTC midnight*, reading back a day early). 
 which are DST-proof. Screens that display "today" should use the `useToday()` hook so the day rolls
 over at local midnight while the app is open. Tests pin `TZ=America/New_York` (`jest.setup.js`) so
 this bug class is actually exercised; see `src/utils/__tests__/date.test.ts`.
+
+**Privacy toggles are contracts**: every switch in Profile → Privacy must be enforced somewhere — `cloudSync` in `src/lib/sync.ts`, `shareDataWithAI` in `src/config/gemini.ts`, `analytics` in `src/lib/monitoring.ts`. Two of them shipped as decoration for a while, which is a straightforward lie to the user and an App Store privacy-label mismatch. If you add a toggle, add its enforcement point and a test in the same change. Changing a persisted default needs a bump to `PRIVACY_SETTINGS_VERSION` plus a branch in `migratePrivacySettings`.
+
+**Accessibility**: any control whose only child is an icon needs `accessibilityLabel` and `accessibilityRole` — screen readers get nothing otherwise. Controls containing a `<Text>` already announce themselves. Toggles should use `accessibilityRole="checkbox"` with `accessibilityState={{ checked }}`. Don't leave a `TouchableOpacity` with no `onPress`; render a `View`.
 
 **Error reporting**: route caught errors through `captureError(err, { scope })` from `src/lib/monitoring.ts` (not bare `console.error`) — it lazy-loads Sentry when `SENTRY_DSN` is configured and respects the Analytics opt-out.

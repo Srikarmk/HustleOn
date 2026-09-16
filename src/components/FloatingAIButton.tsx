@@ -49,6 +49,9 @@ export const FloatingAIButton: React.FC = () => {
     <Pressable
       style={[styles.button, { bottom: buttonBottom }]}
       onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel="Open AI fitness coach"
+      accessibilityHint="Opens a chat with the AI coach"
       onPressIn={() =>
         Animated.spring(press, { toValue: 0.9, useNativeDriver: true, speed: 40, bounciness: 6 }).start()
       }

@@ -110,7 +110,7 @@ export const WorkoutTrackerScreen: React.FC = () => {
                   <Text style={styles.streakText}>{currentStreak}</Text>
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Notification settings"
                 style={styles.headerButton}
                 onPress={() => navigation.navigate('Profile')}
               >
@@ -198,7 +198,7 @@ export const WorkoutTrackerScreen: React.FC = () => {
                   const takenToday = supp.takenDates.includes(today);
                   return (
                     <View key={supp.id} style={styles.supplementItem}>
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: takenToday }} accessibilityLabel={`${supp.name} taken today`}
                         style={styles.supplementCheck}
                         onPress={() => {
                           haptics.selection();
@@ -217,7 +217,7 @@ export const WorkoutTrackerScreen: React.FC = () => {
                           <Text style={styles.supplementDosage}>{supp.dosage}</Text>
                         ) : null}
                       </View>
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remove ${supp.name}`}
                         onPress={() =>
                           Alert.alert('Remove Supplement', `Remove "${supp.name}"?`, [
                             { text: 'Cancel', style: 'cancel' },
@@ -308,7 +308,7 @@ export const WorkoutTrackerScreen: React.FC = () => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add Supplement</Text>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close add supplement"
                 onPress={() => {
                   setShowSupplementModal(false);
                   setSuppName('');

@@ -7,8 +7,28 @@ const DAY_TO_WEEKDAY: Record<string, number> = {
   Sun: 1, Mon: 2, Tue: 3, Wed: 4, Thu: 5, Fri: 6, Sat: 7,
 };
 
+const ANDROID_CHANNEL_ID = 'reminders';
+
+/**
+ * Android needs an explicit channel (API 26+) before anything will display, and
+ * a runtime POST_NOTIFICATIONS grant on API 33+. Neither existed, so Android
+ * notifications silently never appeared.
+ */
+async function ensureAndroidChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+    name: 'Reminders',
+    description: 'Workout, meal and streak reminders.',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    sound: 'default',
+  });
+}
+
 export async function requestNotificationPermissions(): Promise<boolean> {
-  if (Platform.OS !== 'ios') return false;
+  if (Platform.OS === 'web') return false;
+
+  await ensureAndroidChannel();
+
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === 'granted') return true;
   const { status } = await Notifications.requestPermissionsAsync({
@@ -25,6 +45,7 @@ export async function scheduleAllNotifications(
   preferences: NotificationPreference[],
   currentStreak: number
 ): Promise<void> {
+  await ensureAndroidChannel();
   await Notifications.cancelAllScheduledNotificationsAsync();
 
   const { status } = await Notifications.getPermissionsAsync();
@@ -57,6 +78,7 @@ export async function scheduleAllNotifications(
               weekday,
               hour,
               minute,
+              channelId: ANDROID_CHANNEL_ID,
             },
           });
         }
@@ -66,19 +88,42 @@ export async function scheduleAllNotifications(
       case 'meal_reminder': {
         if (!pref.time) break;
         const [hour, minute] = pref.time.split(':').map(Number);
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Log Your Meal 🥗',
-            body: 'Stay on track — tap to log what you ate today.',
-            sound: true,
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-            repeats: true,
-            hour,
-            minute,
-          },
-        });
+        // Honour the configured days; this used to ignore `pref.days` and fire
+        // every day regardless of what the user picked. No days set = daily.
+        const weekdays = (pref.days ?? [])
+          .map((day) => DAY_TO_WEEKDAY[day])
+          .filter((weekday): weekday is number => !!weekday);
+        const content = {
+          title: 'Log Your Meal 🥗',
+          body: 'Stay on track — tap to log what you ate today.',
+          sound: true,
+        };
+        if (weekdays.length === 0 || weekdays.length === 7) {
+          await Notifications.scheduleNotificationAsync({
+            content,
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+              repeats: true,
+              hour,
+              minute,
+              channelId: ANDROID_CHANNEL_ID,
+            },
+          });
+        } else {
+          for (const weekday of weekdays) {
+            await Notifications.scheduleNotificationAsync({
+              content,
+              trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+                repeats: true,
+                weekday,
+                hour,
+                minute,
+                channelId: ANDROID_CHANNEL_ID,
+              },
+            });
+          }
+        }
         break;
       }
 
@@ -99,6 +144,7 @@ export async function scheduleAllNotifications(
             repeats: true,
             hour,
             minute,
+            channelId: ANDROID_CHANNEL_ID,
           },
         });
         break;
@@ -118,6 +164,7 @@ export async function scheduleAllNotifications(
             weekday: 1, // Sunday
             hour: 9,
             minute: 0,
+            channelId: ANDROID_CHANNEL_ID,
           },
         });
         break;

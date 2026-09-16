@@ -22,9 +22,23 @@ import { Image } from 'react-native';
 import { useStore } from '../../store';
 import { COLORS, FONTS, SIZES } from '../../constants/theme';
 import { parseISODate, todayISO } from '../../utils/date';
+import { captureError } from '../../lib/monitoring';
 import { useAuth } from '../../context/AuthContext';
 import { scheduleAllNotifications } from '../../utils/notifications';
 import { Goal, Integration, NotificationPreference } from '../../types';
+
+type IntegrationName = Integration['name'];
+
+const INTEGRATION_META: Record<
+  IntegrationName,
+  { label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }
+> = {
+  fitbit: { label: 'Fitbit', icon: 'watch' },
+  apple_health: { label: 'Apple Health', icon: 'medical' },
+  google_fit: { label: 'Google Fit', icon: 'fitness' },
+  strava: { label: 'Strava', icon: 'bicycle' },
+  myfitnesspal: { label: 'MyFitnessPal', icon: 'restaurant' },
+};
 
 // TODO: replace with the real hosted pages before App Store submission.
 const PRIVACY_URL = 'https://hustleon.app/privacy';
@@ -54,7 +68,6 @@ export const ProfileScreen: React.FC = () => {
     calorieGoal,
     setWeeklyGoal,
     setCalorieGoal,
-    loadData,
     goals,
     integrations,
     notificationPreferences,
@@ -67,7 +80,6 @@ export const ProfileScreen: React.FC = () => {
     addGoal,
     updateGoal,
     removeGoal,
-    updateIntegration,
     updateNotificationPreference,
     updatePrivacySettings,
     updateThemeSettings,
@@ -121,7 +133,8 @@ export const ProfileScreen: React.FC = () => {
 
   useEffect(() => {
     loadProfile();
-    loadData();
+    // No loadData() here: App.tsx owns loading + syncing once per session.
+    // Re-reading AsyncStorage on mount can clobber freshly-synced state.
   }, []);
 
   const loadProfile = async () => {
@@ -264,7 +277,7 @@ export const ProfileScreen: React.FC = () => {
         Alert.alert('Export Complete', `Data exported to: ${fileUri}`);
       }
     } catch (error) {
-      console.error('Export error:', error);
+      captureError(error, { scope: 'profile.exportData' });
       Alert.alert('Error', 'Failed to export data');
     }
   };
@@ -298,33 +311,19 @@ export const ProfileScreen: React.FC = () => {
     Alert.alert('Success', 'Goal saved!');
   };
 
-  // Connect Integration
-  const connectIntegration = async (integration: Integration) => {
-    Alert.alert(
-      'Connect ' + integration.name,
-      `This would open ${integration.name} authentication. For now, this is a placeholder.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Connect',
-          onPress: () => {
-            updateIntegration(integration.id, {
-              connected: true,
-              lastSync: new Date().toISOString(),
-            });
-            Alert.alert('Connected', `${integration.name} has been connected (demo mode)`);
-          },
-        },
-      ]
-    );
-  };
+  // Integrations are not implemented yet — no provider OAuth exists. The rows
+  // below are rendered as disabled "Coming soon" entries. They used to fake a
+  // connected state and tell the user it was a placeholder, which is both
+  // misleading and an App Store guideline 2.1 risk.
 
   const handleNotifToggle = (type: string, value: boolean) => {
     updateNotificationPreference(type, { enabled: value });
     const updated = notificationPreferences.map((p) =>
       p.type === type ? { ...p, enabled: value } : p
     );
-    scheduleAllNotifications(updated, currentStreak).catch(console.error);
+    scheduleAllNotifications(updated, currentStreak).catch((error) =>
+      captureError(error, { scope: 'profile.scheduleNotifications' })
+    );
   };
 
   return (
@@ -334,7 +333,7 @@ export const ProfileScreen: React.FC = () => {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <TouchableOpacity style={styles.avatarContainer} onPress={pickProfilePicture}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Change profile picture" style={styles.avatarContainer} onPress={pickProfilePicture}>
                 {profile.profilePictureUri ? (
                   <Image source={{ uri: profile.profilePictureUri }} style={styles.avatarImage} />
                 ) : (
@@ -351,9 +350,12 @@ export const ProfileScreen: React.FC = () => {
                 <Text style={styles.headerSubtitle}>Manage your account and preferences</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.headerButton}>
+            {/* Decorative only — notification settings already live on this
+                screen, so there is nowhere for this to navigate. Rendered as a
+                plain icon so screen readers don't announce a dead button. */}
+            <View style={styles.headerButton}>
               <Ionicons name="notifications-outline" size={24} color={COLORS.text} />
-            </TouchableOpacity>
+            </View>
           </View>
 
           {/* Profile Information */}
@@ -532,7 +534,7 @@ export const ProfileScreen: React.FC = () => {
           <View style={styles.card}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Goal Management</Text>
-              <TouchableOpacity onPress={() => {
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add a goal" onPress={() => {
                 setEditingGoal(null);
                 setGoalForm({ type: 'weight', title: '', targetValue: '', targetDate: '' });
                 setShowGoalModal(true);
@@ -599,7 +601,7 @@ export const ProfileScreen: React.FC = () => {
                       </View>
                     </View>
                     <View style={styles.goalCardActions}>
-                      <TouchableOpacity onPress={() => {
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Edit goal ${goal.title}`} onPress={() => {
                         setEditingGoal(goal);
                         setGoalForm({
                           type: goal.type,
@@ -611,7 +613,7 @@ export const ProfileScreen: React.FC = () => {
                       }}>
                         <Ionicons name="create-outline" size={20} color={COLORS.textSecondary} />
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => {
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Delete goal ${goal.title}`} onPress={() => {
                         Alert.alert(
                           'Delete Goal',
                           `Delete "${goal.title}"?`,
@@ -644,44 +646,29 @@ export const ProfileScreen: React.FC = () => {
           {/* Integration Hub */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Integration Hub</Text>
-            <Text style={styles.sectionDescription}>Connect your favorite fitness apps</Text>
-            {integrations.map((integration) => (
-              <View key={integration.id} style={styles.integrationItem}>
-                <View style={styles.integrationInfo}>
-                  <Ionicons 
-                    name={integration.name === 'fitbit' ? 'watch' : integration.name === 'apple_health' ? 'medical' : integration.name === 'google_fit' ? 'fitness' : integration.name === 'strava' ? 'bicycle' : 'restaurant'} 
-                    size={24} 
-                    color={integration.connected ? COLORS.success : COLORS.textSecondary} 
-                  />
-                  <View>
-                    <Text style={styles.integrationName}>
-                      {integration.name === 'fitbit' ? 'Fitbit' : 
-                       integration.name === 'apple_health' ? 'Apple Health' : 
-                       integration.name === 'google_fit' ? 'Google Fit' : 
-                       integration.name === 'strava' ? 'Strava' : 
-                       'MyFitnessPal'}
-                    </Text>
-                    {integration.connected && integration.lastSync && (
-                      <Text style={styles.integrationSync}>
-                        Last synced: {new Date(integration.lastSync).toLocaleDateString()}
-                      </Text>
-                    )}
+            <Text style={styles.sectionDescription}>
+              Syncing with other fitness apps isn't available yet.
+            </Text>
+            {integrations.map((integration) => {
+              const meta = INTEGRATION_META[integration.name];
+              return (
+                <View
+                  key={integration.id}
+                  style={[styles.integrationItem, styles.integrationItemDisabled]}
+                  accessible
+                  accessibilityRole="text"
+                  accessibilityLabel={`${meta.label} integration, coming soon`}
+                >
+                  <View style={styles.integrationInfo}>
+                    <Ionicons name={meta.icon} size={24} color={COLORS.textSecondary} />
+                    <View>
+                      <Text style={styles.integrationName}>{meta.label}</Text>
+                    </View>
                   </View>
+                  <Text style={styles.integrationComingSoon}>Coming soon</Text>
                 </View>
-                <Switch
-                  value={integration.connected}
-                  onValueChange={() => {
-                    if (integration.connected) {
-                      updateIntegration(integration.id, { connected: false });
-                    } else {
-                      connectIntegration(integration);
-                    }
-                  }}
-                  trackColor={{ false: COLORS.cardBorder, true: COLORS.success }}
-                  thumbColor="#fff"
-                />
-              </View>
-            ))}
+              );
+            })}
           </View>
 
           {/* Notification Preferences */}
@@ -743,7 +730,7 @@ export const ProfileScreen: React.FC = () => {
                 <Text style={styles.settingLabel}>Layout Style</Text>
                 <Text style={styles.settingSubtext}>{themeSettings.layout}</Text>
               </View>
-              <TouchableOpacity onPress={() => setShowThemeModal(true)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Change theme and layout" onPress={() => setShowThemeModal(true)}>
                 <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -854,7 +841,7 @@ export const ProfileScreen: React.FC = () => {
           <View style={styles.card}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Friends & Social</Text>
-              <TouchableOpacity onPress={() => setShowFriendsModal(true)}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add a friend" onPress={() => setShowFriendsModal(true)}>
                 <Ionicons name="person-add" size={24} color={COLORS.primary} />
               </TouchableOpacity>
             </View>
@@ -876,7 +863,7 @@ export const ProfileScreen: React.FC = () => {
                       Connected {new Date(friend.connectedAt).toLocaleDateString()}
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={() => removeFriend(friend.id)}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remove ${friend.name}`} onPress={() => removeFriend(friend.id)}>
                     <Ionicons name="close-circle" size={24} color={COLORS.error} />
                   </TouchableOpacity>
                 </View>
@@ -1845,6 +1832,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.text,
     marginBottom: 4,
+  },
+  integrationItemDisabled: {
+    opacity: 0.6,
+  },
+  integrationComingSoon: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.caption,
   },
   integrationSync: {
     fontSize: 12,

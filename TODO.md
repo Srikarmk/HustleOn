@@ -7,21 +7,16 @@ See [`README.md`](README.md) for setup and [`CLAUDE.md`](CLAUDE.md) for the full
 
 ## ▶️ Next up (recommended sequence)
 
-> **2026-09-15 audit correction.** This file previously implied the app was code-complete and
-> blocked only on accounts/hosting. That was wrong on two counts, both now fixed:
-> the project failed 4 `expo-doctor` checks and could not have produced a working native build,
-> and a systemic UTC-vs-local date bug corrupted streaks, "today", the calendar and every
-> Summary chart. See the new "Tier 0" section below for what was done, and the remaining
-> **Tier 1** list for what still blocks a real release.
+Tier 0 (build blockers) and Tier 1 (data-loss / privacy / App Store) are **done**.
+What's left is almost entirely your accounts, hosting and decisions.
 
-1. **Me:** Tier 1 correctness/privacy work — see the list below (onboarding-before-auth data loss,
-   sync pagination, the decorative `cloudSync` / `shareDataWithAI` toggles, AI chat left on the
-   device after sign-out).
-2. **You:** run the Supabase manual steps below (2 migrations + 2 functions + secret).
-3. **You:** host Privacy Policy + Terms pages and update the placeholder URLs in `ProfileScreen.tsx`.
-4. **You, when Apple enrollment clears:** confirm the bundle id, run `eas init`, fill the Apple IDs
+1. **You:** run the Supabase manual steps below — 3 migrations, 2 functions, 1 secret,
+   and the auth redirect URL.
+2. **You:** host Privacy Policy + Terms and replace the placeholder URLs in `ProfileScreen.tsx`.
+3. **You, when Apple enrollment clears:** confirm the bundle id, `eas init`, fill the Apple IDs
    in `eas.json`, then `eas build` → `eas submit`. See [`docs/app-store-checklist.md`](docs/app-store-checklist.md).
-5. **You + me:** Phase 1b (Apple + Google sign-in) — needs a Google iOS OAuth client ID from you.
+4. **You + me:** Phase 1b (Apple + Google sign-in) — needs a Google iOS OAuth client ID.
+   Apple Sign In is *required* while a Google button is shown, so both land together.
 
 ---
 
@@ -77,27 +72,62 @@ App Store icon).
 
 ---
 
-## 🔴 Tier 1 — still blocking a real release
+## ✅ Tier 1 — data-loss, privacy & App Store (done 2026-09-16)
 
-- [ ] **Onboarding runs before auth → signing into an existing account wipes its cloud data.**
-      Onboarding writes the profile and bumps `dataUpdatedAt`; login then sees local-newer and
-      pushes, and `push()` deletes remote rows not present locally.
-- [ ] **Sync has no pagination** — Supabase caps `select()` at 1000 rows; past ~1000 meals the pull
-      truncates and the next push deletes the remainder server-side.
-- [ ] **`cloudSync` and `shareDataWithAI` toggles do nothing.** `cloudSync` even defaults to *off*
-      while all health data, photos and profile upload regardless. Only `analytics` is enforced.
-- [ ] **AI chat history survives sign-out** (`@hustleon:ai_chat` is cleared only on account delete)
-      — next user on a shared device reads the previous user's health conversation.
-- [ ] **Integrations openly say "placeholder" / "(demo mode)"** in the UI — App Store guideline 2.1.
-      Remove or disable before submitting.
-- [ ] **Password reset is a dead end** — `resetPasswordForEmail` passes no `redirectTo`
-      (the `scheme` is now configured, so this is wireable).
-- [ ] `removeProgressPhoto` never deletes the storage object; `delete-account` lists only the first
-      100 files.
-- [ ] `increment_ai_usage` is `SECURITY DEFINER` with no `REVOKE` — any user can burn another
-      user's daily AI quota.
-- [ ] Zero accessibility labels across ~227 interactive elements.
-- [ ] Android notifications unimplemented (no permission request, no channel).
+- [x] **Onboarding no longer runs before auth.** Split into `IntroNavigator` (Welcome/Features,
+      writes nothing, pre-auth) and `ProfileSetupNavigator` (UserInfo/GetStarted, post-auth).
+      Profile setup used to bump the sync clock while signed out, so logging into an existing
+      account looked "local newer" and `push()` deleted every remote row — wiping the account's
+      cloud data on any reinstall-then-login. `App.tsx` now loads + syncs *before* deciding
+      whether setup is needed, so an existing user on a new device never re-onboards.
+- [x] **Onboarding flag is per user.** Was one device-global key, so a second account on the
+      same device skipped setup and ended up with no profile. The old key is migrated.
+- [x] **Sync is paged.** PostgREST caps responses at 1000 rows; past ~1000 meals the pull
+      truncated and the next push *deleted the remainder server-side*. Reads, the delete
+      reconcile and storage listing all page now; upserts and deletes are chunked.
+- [x] **`cloudSync` is enforced** in `sync.ts` — the switch was in the UI but never read, so
+      everything uploaded regardless of its position. Default is now ON, with a one-time
+      settings migration (`PRIVACY_SETTINGS_VERSION`) so users whose stored `false` was a dead
+      default keep their cloud backup.
+- [x] **`shareDataWithAI` is enforced** in `gemini.ts` via `{ includesUserData: true }`. The
+      three advice calls that embed weight/BMI/meals are gated; the AI chat and the food lookup
+      are not, because the user types those themselves.
+- [x] **Dropped `aiDataUsage`** — never rendered, duplicated `shareDataWithAI`'s meaning.
+- [x] **Sign-out hygiene.** `clearLocalData()` now also clears the AI chat history (health
+      details, previously wiped only on account deletion) plus notification/privacy/theme
+      settings, which used to carry from one user to the next on a shared device.
+- [x] **Integrations are honest.** The 5 rows no longer fake a connected state or tell the user
+      they're a placeholder; they render disabled with a "Coming soon" label (guideline 2.1).
+- [x] **Password reset works end to end.** `resetPasswordForEmail` sends a `hustleon://`
+      redirect, `AuthContext` handles the incoming deep link and establishes the recovery
+      session, and a new `ResetPasswordScreen` takes over the app until the user sets a new
+      password or cancels. Signup's minimum length raised 6 → 8 to match.
+- [x] **Orphaned photos are collected.** `sync.ts` reconciles bucket contents against
+      referenced paths on every push (so offline deletes are cleaned up too), and
+      `delete-account` pages past the 100-object `list` default.
+- [x] **`increment_ai_usage` locked down** — migration `0003`. It was `SECURITY DEFINER` with
+      the default PUBLIC execute grant, so any signed-in user could burn another account's daily
+      AI quota. EXECUTE revoked, and it now meters `auth.uid()` when called with a JWT.
+- [x] **Accessibility.** All 34 icon-only controls carry `accessibilityLabel` /
+      `accessibilityRole` (the supplement toggle is a real checkbox with state; the FAB is
+      labelled). Profile's dead notification bell — a button with no `onPress` — is now a plain
+      icon. *(The earlier "227 unlabelled elements" figure was wrong: it counted text buttons,
+      which already announce via their child `Text`. The real gap was 34.)*
+- [x] **Android notifications implemented** — notification channel + runtime permission
+      (nothing displayed before), and `meal_reminder` now honours its configured days instead
+      of firing daily.
+- [x] **Errors reach the monitoring seam.** 23 `console.error` sites now route through
+      `captureError`, so a Sentry DSN will actually receive them.
+- [x] **Tests: 31 → 48.** New coverage for the privacy migration, the `cloudSync` and
+      `shareDataWithAI` gates, sign-out hygiene, and auth deep-link parsing.
+
+## ☐ Remaining code item
+
+- [ ] **Crash reporting is inert.** `src/lib/monitoring.ts` is wired app-wide and every error
+      path now flows through it, but `@sentry/react-native` is deliberately *not* installed —
+      it adds a native dependency that does nothing without a DSN. To activate:
+      `npm i @sentry/react-native`, add its Expo plugin to `app.config.js`, set `SENTRY_DSN`,
+      then build a dev client.
 
 ---
 
@@ -107,7 +137,8 @@ Full ship checklist: [`docs/production-readiness.md`](docs/production-readiness.
 
 ## 🚨 Manual steps required (you must do these — code is ready)
 
-- [ ] **Run the SQL migrations** — `0001_init.sql` then `0002_production.sql` in the Supabase SQL Editor. *Without 0001, cloud sync fails silently; 0002 makes photos private + adds AI rate-limiting.*
+- [ ] **Run the SQL migrations** — `0001_init.sql`, then `0002_production.sql`, then `0003_harden_ai_usage.sql` in the Supabase SQL Editor. *Without 0001, cloud sync fails silently; 0002 makes photos private + adds AI rate-limiting; 0003 stops one user burning another's AI quota.*
+- [ ] **Add the auth redirect URL** — Supabase → Authentication → URL Configuration → Redirect URLs: add `hustleon://reset-password`. *Password reset emails are ignored without it.*
 - [ ] **Deploy the Edge Functions** — `supabase functions deploy gemini-proxy` and `supabase functions deploy delete-account`.
 - [ ] **Set the Gemini secret** — `supabase secrets set GEMINI_API_KEY=AIza...`
 - [ ] *(dev)* Disable email confirmation in Supabase Auth so signup logs in immediately.

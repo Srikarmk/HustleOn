@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SIZES } from '../../constants/theme';
+import { captureError } from '../../lib/monitoring';
 import { generateGeminiResponse, FITNESS_COACH_PROMPT, ChatTurn, AI_DISCLAIMER } from '../../config/gemini';
 
 interface Message {
@@ -53,7 +54,7 @@ export const AIChatScreen: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Failed to load chat history:', error);
+        captureError(error, { scope: 'aiChat.load' });
       } finally {
         setHistoryLoaded(true);
       }
@@ -64,7 +65,7 @@ export const AIChatScreen: React.FC = () => {
   useEffect(() => {
     if (historyLoaded) {
       AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages)).catch((error) =>
-        console.error('Failed to save chat history:', error)
+        captureError(error, { scope: 'aiChat.save' })
       );
     }
   }, [messages, historyLoaded]);
@@ -127,7 +128,7 @@ export const AIChatScreen: React.FC = () => {
 
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
-      console.error('Error getting AI response:', error);
+      captureError(error, { scope: 'aiChat.send' });
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: "I apologize, but I'm having trouble processing your request right now. Please try again in a moment.",
@@ -153,7 +154,7 @@ export const AIChatScreen: React.FC = () => {
             <Text style={styles.headerSubtitle}>Your Fitness Coach</Text>
           </View>
         </View>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Start a new chat"
           style={styles.historyButton}
           onPress={handleNewChat}
         >
@@ -219,7 +220,7 @@ export const AIChatScreen: React.FC = () => {
             onSubmitEditing={handleSend}
             returnKeyType="send"
           />
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send message"
             style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
             onPress={handleSend}
             disabled={!inputText.trim() || isLoading}

@@ -343,7 +343,7 @@ export const UserInfoScreen: React.FC<UserInfoScreenProps> = ({ onComplete }) =>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Select Date of Birth</Text>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close date picker" onPress={() => setShowDatePicker(false)}>
                   <Ionicons name="close" size={24} color={COLORS.text} />
                 </TouchableOpacity>
               </View>

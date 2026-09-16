@@ -16,6 +16,8 @@ Legend for "Owner": **Code** = I can do it in the repo · **You** = needs your a
 | Hosted Terms of Service URL | ⏳ | You | Same — `https://hustleon.app/terms` placeholder. |
 | App Privacy labels | ⏳ | You | Fill in App Store Connect. See `docs/app-store-checklist.md`. |
 | Apple Sign In (Phase 1b) | ⏳ | Both | Required because Google is offered. Needs Apple enrollment + `expo-apple-authentication` wiring. |
+| No placeholder features in the UI | ✅ | Code | The 5 integration rows used to fake a connected state and say "placeholder"/"demo mode" (guideline 2.1). Now disabled with a "Coming soon" label. |
+| Privacy toggles do what they say | ✅ | Code | `cloudSync` and `shareDataWithAI` were rendered but never read. Both enforced now — otherwise the App Privacy labels would contradict the app's behaviour. |
 
 ## 🟠 Tier 2 — Needed before real users
 
@@ -30,13 +32,13 @@ Legend for "Owner": **Code** = I can do it in the repo · **You** = needs your a
 | Dedicated prod Supabase project | ⏳ | You | Today: one project, keys hardcoded as defaults in `app.config.js` (fine for dev). For prod: separate project, keys via EAS env. |
 | Supabase Pro tier | ⏳ | You | Free tier pauses on inactivity and has no backups. |
 | Auth emails (SMTP) + re-enable email confirmation | ⏳ | You | Configure SMTP + templates + redirect URLs; turn email confirmation back on (off for dev). |
-| Crash reporting (e.g. Sentry) | ◑ | Both | Seam wired app-wide (`src/lib/monitoring.ts`, `captureError`) and gated on the Analytics toggle. Inert until you `npm i @sentry/react-native`, add the Expo plugin, and set `SENTRY_DSN` — then build a dev client. |
+| Crash reporting (e.g. Sentry) | ◑ | Both | Seam wired app-wide and **every** error path now routes through `captureError` (23 sites converted), so a DSN will actually receive them. Still inert until you `npm i @sentry/react-native`, add the Expo plugin, and set `SENTRY_DSN` — then build a dev client. |
 
 ## 🟡 Tier 3 — Quality / polish
 
 | Item | Status | Owner | Notes |
 |------|--------|-------|-------|
-| Automated tests | ◑ | Code | `jest-expo` (`npm test`): **17 tests** — store (streak, supplements, goals, meals, clearLocalData, applyRemoteState clock), sync LWW decision, monitoring fallback. Extend to auth + full sync IO next. |
+| Automated tests | ◑ | Code | `jest-expo` (`npm test`): **48 tests** — store (DST-safe streaks, local-calendar dates, privacy migration, sign-out hygiene), the `cloudSync` and `shareDataWithAI` gates, auth deep-link parsing, sync LWW decision, monitoring fallback. Extend to full sync IO next. |
 | Offline detection (NetInfo) | ✅ | Code | `@react-native-community/netinfo`: sync skips + marks "offline" when disconnected; App retries on reconnect; Profile shows the offline state. |
 | Per-row / CRDT sync | ☐ | Code | Current model is whole-account last-write-wins (see caveat below). |
 | App Store assets | ⏳ | You | 1024² icon (no alpha), screenshots (6.7"/6.5"; iPad too since `supportsTablet: true` — or set false), description, keywords, age rating, category. |
@@ -50,7 +52,11 @@ Legend for "Owner": **Code** = I can do it in the repo · **You** = needs your a
 ```bash
 # In the Supabase SQL Editor, run in order:
 #   supabase/migrations/0001_init.sql
-#   supabase/migrations/0002_production.sql   (private bucket + ai_usage)
+#   supabase/migrations/0002_production.sql      (private bucket + ai_usage)
+#   supabase/migrations/0003_harden_ai_usage.sql (revoke the rate-limit RPC)
+
+# Authentication -> URL Configuration -> Redirect URLs:
+#   hustleon://reset-password      (password reset emails are ignored without it)
 
 # Deploy Edge Functions:
 supabase functions deploy gemini-proxy
