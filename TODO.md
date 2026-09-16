@@ -27,13 +27,19 @@ See [`README.md`](README.md) for setup and [`CLAUDE.md`](CLAUDE.md) for the full
 
 ## ✅ Tier 0 — build blockers (done 2026-09-15)
 
-The app could not have built or run correctly before these. All four `expo-doctor` failures are
-resolved, `tsc --noEmit` is clean, `npm test` is **31/31**, and `expo export` bundles successfully.
+The app could not have built or run correctly before these.
 
-> Note: `expo-doctor`'s "packages match versions required by installed Expo SDK" check is
-> intermittent — it fails on roughly one run in three while its own payload reports
-> `{"dependencies":[],"upToDate":true}` (i.e. no mismatches). It depends on a network lookup.
-> `npx expo install --check` is the reliable signal and reports "Dependencies are up to date".
+Verified on `main`: `expo-doctor` **18/18**, `expo install --check` up to date, `tsc --noEmit`
+clean, `npm test` **31/31**, `expo export` bundles for **both** platforms, and
+`expo prebuild --platform ios` generates a correct native project
+(`NSPhotoLibraryUsageDescription` present, camera/mic absent, bundle id `com.hustleon.app`,
+`hustleon` URL scheme, dark UI style, `PrivacyInfo.xcprivacy`, and a 1024px **alpha-free**
+App Store icon).
+
+- [x] **dotenv was corrupting tooling output** — it prints a promo banner to stdout, which was
+      prepended to the JSON from `expo install --check --json`, so `expo-doctor`'s dependency
+      check failed to `JSON.parse` and reported a failure on every run despite zero mismatches.
+      Fixed with `quiet: true`. (`/ios` and `/android` are now gitignored as CNG output.)
 
 - [x] **Real app icon** — `assets/icon.png` was still the stock Expo placeholder (grey circles).
       Replaced with a brand mark; SVG sources kept at `assets/icon.svg` / `assets/icon-mark.svg`.
