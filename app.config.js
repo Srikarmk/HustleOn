@@ -3,7 +3,11 @@ const path = require('path');
 // Load .env from project root (used for optional Supabase overrides only).
 // NOTE: GEMINI_API_KEY is NOT read here — it lives as a Supabase Edge Function
 // secret (gemini-proxy) and must never ship in the app bundle.
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+// `quiet: true` matters: dotenv otherwise prints a promo banner to STDOUT, which
+// corrupts the JSON that tooling parses out of this config (it made
+// `expo-doctor`'s dependency check fail with a JSON.parse error even though
+// there were no mismatches).
+require('dotenv').config({ path: path.resolve(__dirname, '.env'), quiet: true });
 
 module.exports = {
   expo: {
