@@ -11,6 +11,7 @@ module.exports = {
     slug: 'HustleOn',
     version: '1.0.0',
     orientation: 'portrait',
+    scheme: 'hustleon',
     icon: './assets/icon.png',
     userInterfaceStyle: 'dark',
     newArchEnabled: true,
@@ -47,9 +48,12 @@ module.exports = {
       },
     },
     android: {
+      // TODO: confirm before the first Play Console upload — permanent once registered.
+      package: 'com.hustleon.app',
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#ffffff',
+        // Must not be white: the foreground mark is white and would vanish.
+        backgroundColor: '#7864b4',
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
@@ -69,6 +73,23 @@ module.exports = {
     },
     plugins: [
       ['expo-notifications', {}],
+      // Required: injects NSPhotoLibraryUsageDescription. Without this plugin the
+      // Info.plist key is missing and iOS kills the app on the first photo pick.
+      [
+        'expo-image-picker',
+        {
+          photosPermission:
+            'HustleOn needs access to your photos so you can add progress photos and a profile picture.',
+          // The app only ever calls launchImageLibraryAsync — declaring camera or
+          // microphone access we never use invites App Review questions. Flip these
+          // to strings if in-app capture is added.
+          cameraPermission: false,
+          microphonePermission: false,
+        },
+      ],
+      // @expo/vector-icons peer dependency; also required as a config plugin.
+      'expo-font',
+      '@react-native-community/datetimepicker',
     ],
   },
 };

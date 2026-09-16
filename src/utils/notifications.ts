@@ -57,7 +57,7 @@ export async function scheduleAllNotifications(
               weekday,
               hour,
               minute,
-            } as any,
+            },
           });
         }
         break;
@@ -77,7 +77,7 @@ export async function scheduleAllNotifications(
             repeats: true,
             hour,
             minute,
-          } as any,
+          },
         });
         break;
       }
@@ -99,7 +99,7 @@ export async function scheduleAllNotifications(
             repeats: true,
             hour,
             minute,
-          } as any,
+          },
         });
         break;
       }
@@ -118,7 +118,7 @@ export async function scheduleAllNotifications(
             weekday: 1, // Sunday
             hour: 9,
             minute: 0,
-          } as any,
+          },
         });
         break;
       }

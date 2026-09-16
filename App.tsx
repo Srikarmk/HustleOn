@@ -25,10 +25,12 @@ import { COLORS } from './src/constants/theme';
 // Initialize crash reporting as early as possible (no-op until a DSN is set).
 initMonitoring();
 
-// Show notifications while app is in the foreground
+// Show notifications while app is in the foreground.
+// `shouldShowAlert` was split into banner + list in expo-notifications 0.30.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),
