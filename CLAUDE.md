@@ -4,6 +4,10 @@
 
 HustleOn is a React Native fitness tracking app built with Expo. It covers workout logging, calorie tracking, BMI/body tracking, monthly summaries, and an AI coach powered by Google Gemini 2.5 Flash.
 
+> **New machine or new session? Read [`HANDOFF.md`](HANDOFF.md) first** — it has the verified
+> state, setup, what's blocked on the user's accounts, what's left to build, and what still
+> needs testing on a real device. `AGENTS.md` is a symlink to this file.
+
 **Current state:** Real Supabase email/password auth, local-first store with cloud sync, and AI behind a server-side Edge Function proxy. Builds clean (`tsc`, `jest`, `expo export`). **Not yet released** — see [`TODO.md`](TODO.md) Tier 1 for the remaining blockers.
 
 ---

@@ -2,7 +2,10 @@
 
 A React Native (Expo) fitness tracking app — workout logging, calorie tracking, BMI/body metrics, monthly summaries, and an AI fitness coach powered by Google Gemini. Local-first with background cloud sync to Supabase, real email/password auth, and iOS local notifications + app-icon badges.
 
-> **Platform:** iOS-first (notifications + badges are iOS-only). Android/web run via Expo but aren't the target.
+> **Platform:** iOS-first. Android now has a notification channel + runtime permission, but iOS is the target (the streak badge is iOS-only).
+
+> **Picking this up on a new machine?** Start with **[`HANDOFF.md`](HANDOFF.md)** — current state,
+> setup, what's blocked on accounts, what's left to build, and the traps worth knowing.
 
 ---
 
@@ -13,7 +16,7 @@ A React Native (Expo) fitness tracking app — workout logging, calorie tracking
 - **Body tracking** — BMI, body composition, body measurements, progress photos, trend charts
 - **Monthly summary** — workout stats, weekly breakdown, day-of-week distribution, AI insights
 - **AI coach** — free-form fitness chat (persisted), plus per-screen AI advice
-- **Profile & settings** — goals, integrations (placeholder), notification prefs, privacy, GDPR export
+- **Profile & settings** — goals, integrations (disabled, "coming soon"), notification prefs, enforced privacy toggles, GDPR export
 - **Cloud sync** — data + photos sync across devices (Supabase), works offline
 - **Auth** — real Supabase email/password (Apple + Google sign-in planned)
 

@@ -1,7 +1,8 @@
 # HustleOn — TODO
 
 Status tracker. ✅ = done in code, ⏳ = blocked/pending, ☐ = not started.
-See [`README.md`](README.md) for setup and [`CLAUDE.md`](CLAUDE.md) for the full audit/architecture.
+See [`HANDOFF.md`](HANDOFF.md) to pick the project up cold, [`README.md`](README.md) for setup,
+and [`CLAUDE.md`](CLAUDE.md) for the architecture and conventions.
 
 ---
 
